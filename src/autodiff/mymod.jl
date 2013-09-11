@@ -189,6 +189,7 @@ module Abcd
 
 			# if more than 2 arguments, +, sum and * are converted  to nested expressions
 			#  (easier for derivation)
+			#  TODO : apply to max, min
 			# TODO : apply to other n-ary (n>2) operators ?
 			if contains([:+, :*, :sum], na[1]) 
 				while length(args) > 2
@@ -417,6 +418,9 @@ module Abcd
 		fn = gensym()
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = :(let; global $fn; $vhooks; $body; end)
+		
+		println(body)
+
 		eval(body)
 		fn = eval(fn)
 
@@ -465,13 +469,17 @@ module Abcd
 			for v in avars 
 				vh = vhint[v]
 				if isa(vh, Real)
-					push!(body, :($(dsym(v)) = 0.))
+					push!(body, :($(dsym(v)) = 0.) )
+				elseif 	isa(vh, LLAcc)
+					push!(body, :($(dsym(v)) = 0.) )
 				elseif 	isa(vh, Array{Float64})
 					push!(body, :($(dsym(v)) = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
-				elseif 	isa(vh, Distribution)  #  TODO : find real equivament vector size
+				elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
 					push!(body, :($(dsym(v)) = zeros(2)))
+				elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
+					push!(body, :($(dsym(v)) = zeros(Float64, $(Expr(:tuple,size(vh)...,2)) )) )
 				else
-					error("[generateModelFunction] invalid gradient var type $v $(typeof(v))")
+					error("[generateModelFunction] invalid gradient var type $v $(typeof(vh))")
 				end
 			end
 
@@ -479,12 +487,12 @@ module Abcd
 			header = Expr[]  # let block statements
 			fvars = union(Set([e.args[1] for e in body]...), Set(PARAM_SYM)) # vars that are re-evaluated at each function call
 			for ex in [m.exprs..., m.dexprs...]
-				if length(intersect(getSymbols(ex.args[2]), fvars)) > 0
+				# if length(intersect(getSymbols(ex.args[2]), fvars)) > 0
 					push!(body, ex)
 					fvars = union(fvars, getSymbols(ex.args[1]))
-				else
-					push!(header, ex)
-				end
+				# else
+				# 	push!(header, ex)
+				# end
 			end
 
 			# prefix statements with 'local' at first occurence
@@ -559,6 +567,23 @@ module Abcd
 	end
 
 
+	function debug(model::Expr; init...)
+		m = ParsingStruct()
+		setInit!(m, init)
+		parseModel!(m, model)
+		unfold!(m)
+		uniqueVars!(m)
+		categorizeVars!(m)
+
+		println(Expr(:block, m.exprs...))
+		
+		preCalculate(m)
+		backwardSweep!(m)
+
+		println()
+		println(Expr(:block, m.dexprs...))
+
+	end
 
 
 	include("mydiff.jl")
