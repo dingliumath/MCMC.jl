@@ -24,8 +24,12 @@ function deriv1(ex::Expr, x0::Union(Float64, Vector{Float64}, Matrix{Float64}))
 		gradn[i] = (l-l0)/DIFF_DELTA
 	end
 
-	assert( all(good_enough, zip([grad0], [gradn])),
-		"Gradient false for $ex at x=$x0, expected $(round(gradn,5)), got $(round(grad0,5))")
+	if ! all(good_enough, zip([grad0], [gradn]))
+		println("Gradient false for $ex at x=$x0, expected $(round(gradn,5)), got $(round(grad0,5))")
+		println()
+		println(Abcd.generateModelFunction(ex, gradient=true, x=x0, debug=true) )
+		error()
+	end
 end
 
 
