@@ -1,16 +1,7 @@
 module Abcd
 
 	using Distributions
-	
-	const ACC_SYM = :__acc       # name of accumulator variable
-	const PARAM_SYM = :__beta    # name of parameter vector
-	const TEMP_NAME = "tmp"      # prefix of temporary variables in log-likelihood function
-	const DERIV_PREFIX = "d"     # prefix of gradient variables in log-likelihood function
-
-	immutable PDims
-		pos::Integer   # starting position of parameter in the parameter vector
-		dims::Tuple    # dimensions of user facing parameter, can be a scalar, vector or matrix
-	end
+	using Base.LinAlg.BLAS
 
 	##########  creates a parameterized type to ease AST exploration  ############
 	type ExprH{H}
@@ -57,6 +48,27 @@ module Abcd
 	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
 	substSymbols(ex::Any, smap::Dict) =           ex
 	substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = get(smap, ex.args[1], ex.args[1]) ; toExpr(ex) )
+
+	
+	# naming conventions + functions
+	const ACC_SYM = :_acc       # name of accumulator variable
+	const PARAM_SYM = :_beta    # name of parameter vector
+	const TEMP_NAME = "tmp"     # prefix of temporary variables in log-likelihood function
+	const DERIV_PREFIX = "_d"   # prefix of gradient variables
+
+	dprefix(v::Union(Symbol, String, Char)) = symbol("$DERIV_PREFIX$v")
+	dprefix(v::Expr) = dprefix(toExprH(v))
+	dprefix(v::Exprref) = Expr(:ref, dprefix(v.args[1]), v.args[2:end]...)
+	dprefix(v::Exprdot) = Expr(:., dprefix(v.args[1]), v.args[2:end]...)
+
+	isSymbol(ex)   = isa(ex, Symbol)
+	isDot(ex)      = isa(ex, Expr) && ex.head == :.   && isa(ex.args[1], Symbol)
+	isRef(ex)      = isa(ex, Expr) && ex.head == :ref && isa(ex.args[1], Symbol)
+
+	immutable PDims
+		pos::Integer   # starting position of parameter in the parameter vector
+		dims::Tuple    # dimensions of user facing parameter, can be a scalar, vector or matrix
+	end
 
 	######### structure for parsing model  ##############
 	type ParsingStruct
@@ -172,7 +184,7 @@ module Abcd
 				"[unfold] not a symbol on LHS of assigment $ex")
 
 			rhs = ex.args[2]
-			if isa(rhs, Symbol) || isa(rhs, Real) || (isa(rhs, Expr) && rhs.head == :.)
+			if isSymbol(rhs) || isa(rhs, Real) || isDot(rhs)
 				push!(m.exprs, Expr(:(=), lhs, rhs))
 			elseif isa(rhs, Expr) 
 					ue = explore(toExprH(rhs)) # explore will return something in this case
@@ -251,7 +263,7 @@ module Abcd
 	#   3) TODO : remove unnecessary variables (with warning)
 	#   4) identify external vars
 	function categorizeVars!(m::ParsingStruct) 
-		lhsSymbol(ex) = Set(isa(ex.args[1], Symbol) ? ex.args[1] : ex.args[1].args[1])
+		lhsSymbol(ex) = Set(isSymbol(ex.args[1]) ? ex.args[1] : ex.args[1].args[1])
 
 	    m.varsset = mapreduce(lhsSymbol, union, m.exprs)
 
@@ -268,7 +280,6 @@ module Abcd
 	    for ex2 in reverse(m.exprs) # proceed backwards ex2 = reverse(m.exprs)[3]
 	        lhs = lhsSymbol(ex2)
 	        rhs = setdiff(getSymbols(ex2), lhs) # to pickup potential index on lhs as an ancestor
-	        # isa(ex2.args[1], Expr) && ex2.args[1].head == :ref && union!(rhs, getSymbols(ex2.args[1].args[2]))
 
 	        !isempty(intersect(lhs, m.accanc)) && union!(m.accanc, rhs)
 	    end
@@ -289,28 +300,22 @@ module Abcd
 
 		function explore(ex::Exprequal)
 			lhs = ex.args[1]
-			if isa(lhs,Symbol) # simple var case
-				dsym = lhs
-				dsym2 = symbol("$(DERIV_PREFIX)$lhs")
-			elseif isa(lhs,Expr) && lhs.head == :ref  # vars with []
-				dsym = lhs
-				dsym2 = Expr(:ref, symbol("$(DERIV_PREFIX)$(lhs.args[1])"), lhs.args[2:end]...)
-			else
-				error("[backwardSweep] not a symbol on LHS of assigment $(ex)") 
-			end
+			assert(isSymbol(lhs) || isRef(lhs), "[backwardSweep] not a symbol / ref on LHS of assigment $(ex)")
+			dsym = lhs
+			dsym2 = dprefix(lhs)
 			
 			rhs = ex.args[2]
-			if !isa(rhs,Symbol) && !isa(rhs,Expr) # some kind of number, nothing to do
+			if !isSymbol(rhs) && !isa(rhs,Expr) # some kind of number, nothing to do
 
-			elseif isa(rhs,Symbol) 
+			elseif isSymbol(rhs) 
 				if contains(avars, rhs)
-					vsym2 = symbol("$(DERIV_PREFIX)$rhs")
-					push!(m.dexprs, :( $vsym2 = $dsym2))
+					vsym2 = dprefix(rhs)
+					push!(m.dexprs, :( $vsym2 = $dsym2 ))
 				end
 
-			elseif isa(toExprH(rhs), Exprref)
+			elseif isRef(rhs)
 				if contains(avars, rhs.args[1])
-					vsym2 = Expr(:ref, symbol("$(DERIV_PREFIX)$(rhs.args[1])"), rhs.args[2:end]...)
+					vsym2 = dprefix(rhs)
 					push!(m.dexprs, :( $vsym2 = $dsym2))
 				end
 
@@ -367,7 +372,6 @@ module Abcd
 	            error("[setInit] unsupported parameter type for $(par)")
 	        end
 	    end
-
 	end
 
 	function betaAssign(m::ParsingStruct)
@@ -419,7 +423,7 @@ module Abcd
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = :(let; global $fn; $vhooks; $body; end)
 		
-		println(body)
+		# println(body)
 
 		eval(body)
 		fn = eval(fn)
@@ -458,7 +462,7 @@ module Abcd
 			backwardSweep!(m)
 
 			body = Expr[] # list of = expr making the model
-			dsym(v::Symbol) = symbol("$DERIV_PREFIX$(v)")
+			dsym(v::Symbol) = dprefix(v)
 
 			# initialization statements 
 			body = [ betaAssign(m)...,              # assigments beta vector -> model parameter vars
@@ -496,19 +500,19 @@ module Abcd
 			end
 
 			# prefix statements with 'local' at first occurence
-			vars  = Set(PARAM_SYM)
-			for i in 1:length(header)
-				if length(intersect(getSymbols(header[i].args[1]), vars)) == 0
-					header[i] = :(local $(header[i]))
-					vars = union(vars, getSymbols(header[i].args[1]))
-				end
-			end
-			for i in 1:length(body)
-				if length(intersect(getSymbols(body[i].args[1]), vars)) == 0
-					body[i] = :(local $(body[i]))
-					vars = union(vars, getSymbols(body[i].args[1]))
-				end
-			end
+			# vars  = Set(PARAM_SYM)
+			# for i in 1:length(header)
+			# 	if length(intersect(getSymbols(header[i].args[1]), vars)) == 0
+			# 		header[i] = :(local $(header[i]))
+			# 		vars = union(vars, getSymbols(header[i].args[1]))
+			# 	end
+			# end
+			# for i in 1:length(body)
+			# 	if length(intersect(getSymbols(body[i].args[1]), vars)) == 0
+			# 		body[i] = :(local $(body[i]))
+			# 		vars = union(vars, getSymbols(body[i].args[1]))
+			# 	end
+			# end
 
 			# return statement (note : gradient vec should match beta variable mapping)
 			# dexp = { :( vec([$(dsym(p.sym))]) ) for p in m.pars}
@@ -562,6 +566,8 @@ module Abcd
 		fn = gensym("ll")
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = Expr(:let, Expr(:block, :(global $fn), header..., body))
+
+		# println("#############\n$body\n############")
 
 		debug ? body : (eval(body) ; (eval(fn), m.bsize, m.pars, m.init) )
 	end

@@ -37,7 +37,7 @@ end
 # only additions are possible with LLAcc type 
 @dfunc +(x::LLAcc, y       )    x     dx += ds
 @dfunc +(x::LLAcc, y::Real)     y     dy += ds
-@dfunc +(x::LLAcc, y::Array)    y     for i in 1:length(ds) ; dy[i] += ds[i]  ;end
+@dfunc +(x::LLAcc, y::Array)    y     for i in 1:length(y) ; dy[i] += ds ;end
 
 # unary substraction
 @dfunc -(x::Real )              x     dx -= ds
@@ -53,11 +53,13 @@ end
 
 # sum()
 @dfunc sum(x::Real )       x     dx += ds
-@dfunc sum(x::Array)       x     for i in 1:length(ds) ; dx[i] += ds     ;end
+@dfunc sum(x::Array)       x     for i in 1:length(x) ; dx[i] += ds     ;end
 
 # dot()
-@dfunc dot(x::Array, y::Array)    x     for i in 1:length(ds) ; dx[i] += y[i]*ds[i]  ;end
-@dfunc dot(x::Array, y::Array)    y     for i in 1:length(ds) ; dy[i] += x[i]*ds[i]  ;end
+@dfunc dot(x::Real , y::Real )    x     dx += y*ds
+@dfunc dot(x::Array, y::Array)    x     for i in 1:length(x) ; dx[i] += y[i]*ds ;end
+@dfunc dot(x::Real , y::Real )    y     dy += x*ds
+@dfunc dot(x::Array, y::Array)    y     for i in 1:length(y) ; dy[i] += x[i]*ds ;end
 
 # log() and exp()
 @dfunc log(x::Real )       x     dx += ds / x
@@ -97,6 +99,10 @@ end
 @dfunc min(x::Array, y::Array)   y     for i in 1:length(ds) ; dy[i] += (x[i] > y[i]) * ds[i] ; end
 
 # multiplication
+# @dfunc *(x::Real, y)     x     sum(ds .* y)
+# @dfunc *(x::Array, y)    x     ds * transpose(y)
+# @dfunc *(x, y::Real)     y     sum(ds .* x)
+# @dfunc *(x, y::Array)    y     transpose(x) * ds
 @dfunc *(x::Real , y::Real )   x     dx += y * ds
 @dfunc *(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += y[i] * ds[i] ; end
 @dfunc *(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += y * ds[i] ; end
@@ -106,28 +112,44 @@ end
 @dfunc *(x::Real , y::Real )   y     dy += x * ds
 @dfunc *(x::Real , y::Array)   y     for i in 1:length(ds) ; dy[i] += x * ds[i] ; end
 @dfunc *(x::Array, y::Real )   y     for i in 1:length(ds) ; dy += x[i] * ds[i] ; end
+@dfunc *(x::Array, y::Vector)  y     gemm!('T', 'N', 1., x, reshape(ds, length(ds), 1), 1., dy)
 @dfunc *(x::Array, y::Array)   y     gemm!('T', 'N', 1., x, ds, 1., dy)
 
-# @dfunc *(x::Real, y)     x     sum(ds .* y)
-# @dfunc *(x::Array, y)    x     ds * transpose(y)
-# @dfunc *(x, y::Real)     y     sum(ds .* x)
-# @dfunc *(x, y::Array)    y     transpose(x) * ds
-
 # dot multiplication
-@dfunc .*(x::Real, y)    x     sum(ds .* y)
-@dfunc .*(x::Array, y)   x     ds .* y
-@dfunc .*(x, y::Real)    y     sum(ds .* x)
-@dfunc .*(x, y::Array)   y     ds .* x
+# @dfunc .*(x::Real, y)    x     sum(ds .* y)
+# @dfunc .*(x::Array, y)   x     ds .* y
+# @dfunc .*(x, y::Real)    y     sum(ds .* x)
+# @dfunc .*(x, y::Array)   y     ds .* x
+@dfunc .*(x::Real , y::Real )   x     dx += y .* ds
+@dfunc .*(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += y[i] * ds[i] ; end
+@dfunc .*(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += y * ds[i] ; end
+@dfunc .*(x::Array, y::Array)   x     for i in 1:length(ds) ; dx[i] += y[i] * ds[i] ; end
 
-@dfunc ^(x::Real, y::Real)  x     y * x ^ (y-1) * ds # Both args reals
-@dfunc ^(x::Real, y::Real)  y     log(x) * x ^ y * ds # Both args reals
+@dfunc .*(x::Real , y::Real )   y     dy += x * ds
+@dfunc .*(x::Real , y::Array)   y     for i in 1:length(ds) ; dy[i] += x * ds[i] ; end
+@dfunc .*(x::Array, y::Real )   y     for i in 1:length(ds) ; dy += x[i] * ds[i] ; end
+@dfunc .*(x::Array, y::Array)   y     for i in 1:length(ds) ; dy[i] += x[i] * ds[i] ; end
 
-@dfunc .^(x::Real, y)    x     sum(y .* x .^ (y-1) .* ds)
-@dfunc .^(x::Array, y)   x     y .* x .^ (y-1) .* ds
-@dfunc .^(x, y::Real)    y     sum(log(x) .* x .^ y .* ds)
-@dfunc .^(x, y::Array)   y     log(x) .* x .^ y .* ds
+# power  (both args reals)
+@dfunc ^(x::Real, y::Real)  x     dx += y * x ^ (y-1) * ds
+@dfunc ^(x::Real, y::Real)  y     dy += log(x) * x ^ y * ds
+
+# dot power
+@dfunc .^(x::Real , y::Real )    x     dx += y * x ^ (y-1) * ds
+@dfunc .^(x::Real , y::Array)    x     for i in 1:length(ds) ; dx += y[i] * x ^ (y[i]-1) * ds[i] ; end
+@dfunc .^(x::Array, y::Real )    x     for i in 1:length(ds) ; dx[i] += y * x[i] ^ (y-1) * ds[i] ; end
+@dfunc .^(x::Array, y::Array)    x     for i in 1:length(ds) ; dx[i] += y[i] * x[i] ^ (y[i]-1) * ds[i] ; end
+
+@dfunc .^(x::Real , y::Real )    y     dy += log(x) * x ^ y * ds
+@dfunc .^(x::Array, y::Real )    y     for i in 1:length(ds) ; dy += log(x[i]) * x[i] ^ y * ds[i] ; end
+@dfunc .^(x::Real , y::Array)    y     for i in 1:length(ds) ; dy[i] += log(x) * x ^ y[i] * ds[i] ; end
+@dfunc .^(x::Array, y::Array)    y     for i in 1:length(ds) ; dy[i] += log(x[i]) * x[i] ^ y[i] * ds[i] ; end
 
 # division
+# @dfunc /(x::Real, y)          x     sum(ds ./ y)
+# @dfunc /(x::Array, y::Real)   x     ds ./ y
+# @dfunc /(x, y::Real)          y     sum(- x ./ (y .* y) .* ds)
+# @dfunc /(x::Real, y::Array)   y     (- x ./ (y .* y)) .* ds
 @dfunc /(x::Real , y::Real )   x     dx += ds / y
 @dfunc /(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += ds[i] / y[i] ; end
 @dfunc /(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += ds[i] / y ; end
@@ -136,20 +158,24 @@ end
 @dfunc /(x::Real , y::Array)   y     for i in 1:length(ds) ; dy[i] -= x * ds[i] / (y[i]*y[i]) ; end
 @dfunc /(x::Array, y::Real )   y     for i in 1:length(ds) ; dy -= x[i] * ds[i] / (y * y); end
 
-# @dfunc /(x::Real, y)          x     sum(ds ./ y)
-# @dfunc /(x::Array, y::Real)   x     ds ./ y
-# @dfunc /(x, y::Real)          y     sum(- x ./ (y .* y) .* ds)
-# @dfunc /(x::Real, y::Array)   y     (- x ./ (y .* y)) .* ds
-
 # dot division
-@dfunc ./(x::Real, y)        x     sum(ds ./ y)
-@dfunc ./(x::Array, y)       x     ds ./ y
-@dfunc ./(x, y::Real)        y     sum(- x ./ (y .* y) .* ds)
-@dfunc ./(x, y::Array)       y     (- x ./ (y .* y)) .* ds
+# @dfunc ./(x::Real, y)        x     sum(ds ./ y)
+# @dfunc ./(x::Array, y)       x     ds ./ y
+# @dfunc ./(x, y::Real)        y     sum(- x ./ (y .* y) .* ds)
+# @dfunc ./(x, y::Array)       y     (- x ./ (y .* y)) .* ds
+@dfunc ./(x::Real , y::Real )   x     dx += ds / y
+@dfunc ./(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += ds[i] / y[i] ; end
+@dfunc ./(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += ds[i] / y ; end
+@dfunc ./(x::Array, y::Array)   x     for i in 1:length(ds) ; dx[i] += ds[i] / y[i] ; end
+
+@dfunc ./(x::Real , y::Real )   y     dy -= x * ds / (y * y)
+@dfunc ./(x::Real , y::Array)   y     for i in 1:length(ds) ; dy[i] -= x * ds[i] / (y[i]*y[i]) ; end
+@dfunc ./(x::Array, y::Real )   y     for i in 1:length(ds) ; dy -= x[i] * ds[i] / (y * y); end
+@dfunc ./(x::Array, y::Array)   y     for i in 1:length(ds) ; dy[i] -= x[i] * ds[i] / (y[i] * y[i]); end
 
 
-@dfunc transpose(x::Real )   x   +ds
-@dfunc transpose(x::Array)   x   transpose(ds)
+@dfunc transpose(x::Real )   x   dx += ds
+@dfunc transpose(x::Array)   x   dx += transpose(ds)
 
 # ## Normal distribution
 # # @dfunc logpdfNormal(mu::Real, sigma, x)    mu     sum((x - mu) ./ (sigma .* sigma)) * ds
@@ -158,27 +184,23 @@ end
 # # @dfunc logpdfNormal(mu, sigma::Array, x)   sigma  ((x - mu).*(x - mu) ./ (sigma.*sigma) - 1.) ./ sigma * ds
 # # @dfunc logpdfNormal(mu, sigma, x::Real)    x      sum((mu - x) ./ (sigma .* sigma)) * ds
 # # @dfunc logpdfNormal(mu, sigma, x::Array)   x      (mu - x) ./ (sigma .* sigma) * ds
-
 @dfunc Normal(x1, x2)    x1     dx1 = ds[1]
 @dfunc Normal(x1, x2)    x2     dx2 = ds[2]
 
-# if OS_NAME == :Windows
+@dfunc logpdf(d::Normal, x::Real)    d  ( dd[1] += (x - d.mean) * ds / (d.std*d.std) ;
+										  dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
+@dfunc logpdf(d::Normal, x::Array)   d  ( for i in 1:length(ds) ; dd[1] += (x[i] - d.mean) * ds / (d.std*d.std) ; end ;
+									      for i in 1:length(ds) ; dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds ; end )
+@dfunc logpdf(d::Normal, x::Real)    x   dx += (d.mean - x) / (d.std * d.std) * ds
+@dfunc logpdf(d::Normal, x::Array)   x   for i in 1:length(ds) ; dx[i] += (d.mean - x[i]) / (d.std * d.std) * ds[i] ; end
 
-	@dfunc logpdf(d::Normal, x::Real)    d  ( dd[1] += (x - d.mean) * ds / (d.std*d.std) ;
-											  dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
-	@dfunc logpdf(d::Normal, x::Array)   d  ( for i in 1:length(ds) ; dd[1] += (x[i] - d.mean) * ds / (d.std*d.std) ; end ;
-										      for i in 1:length(ds) ; dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds ; end )
-	@dfunc logpdf(d::Normal, x::Real)    x   dx += (d.mean - x) / (d.std * d.std) * ds
-	@dfunc logpdf(d::Normal, x::Array)   x   for i in 1:length(ds) ; dx[i] += (d.mean - x[i]) / (d.std * d.std) * ds[i] ; end
 
-# else
 # 	@dfunc logpdf(d::Normal, x::Real)    d  ( [ (x - d.μ) * ds / (d.σ*d.σ),
 # 										        ((x - d.μ)*(x - d.μ) / (d.σ*d.σ) - 1.) / d.σ * ds ] )
 # 	@dfunc logpdf(d::Normal, x::Array)   d  ( [ sum((x - d.μ) .* ds) / (d.σ*d.σ),
 # 										        sum(((x - d.μ).*(x - d.μ) ./ (d.σ*d.σ) - 1.) ./ d.σ .* ds) ] )
 # 	@dfunc logpdf(d::Normal, x::Real)    x      (d.μ - x) / (d.σ * d.σ) * ds
 # 	@dfunc logpdf(d::Normal, x::Array)   x      (d.μ - x) / (d.σ * d.σ) .* ds
-# end
 
 # ## Uniform distribution
 # # @dfunc logpdfUniform(a::Real, b, x)      a   sum((a .<= x .<= b) ./ (b - a)) * ds
@@ -268,11 +290,11 @@ end
 # @dfunc logpdfBernoulli(p::Array, x)    p     (1. ./ (p - (1. - x))) * ds
 
 @dfunc Bernoulli(a::Real)         a       da = ds[1]
-@dfunc Bernoulli(a::Array)        a       for i in 1:length(ds) ; da[i] = ds[i][1] ; end
+@dfunc Bernoulli(a::Array)        a       for i in 1:length(ds) ; da[i] = ds[i,1] ; end
 
 @dfunc logpdf(d::Bernoulli, x::Real)           d   dd[1] += 1. / (d.p1 - 1. + x) * ds
 @dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd[1] += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
-@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd[i][1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
+@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd[i,1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
 
 import Distributions.logpdf
 
