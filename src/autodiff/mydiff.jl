@@ -13,8 +13,8 @@ macro dfunc(func::Expr, dv::Symbol, diff::Expr)
 
 	# change var names in signature and diff expr to x1, x2, x3, ..
 	smap = { argsn[i] => symbol("x$i") for i in 1:length(argsn) }
-	args2 = substSymbols(func.args[2:end], smap)
 	smap[ symbol("d$dv")] = symbol("dacc")  ################
+	args2 = substSymbols(func.args[2:end], smap)
 
 	# diff function name
 	fn = symbol("d_$(func.args[1])_x$index")
@@ -189,8 +189,8 @@ end
 
 @dfunc logpdf(d::Normal, x::Real)    d  ( dd[1] += (x - d.mean) * ds / (d.std*d.std) ;
 										  dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
-@dfunc logpdf(d::Normal, x::Array)   d  ( for i in 1:length(ds) ; dd[1] += (x[i] - d.mean) * ds / (d.std*d.std) ; end ;
-									      for i in 1:length(ds) ; dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds ; end )
+@dfunc logpdf(d::Normal, x::Array)   d  ( for i in 1:size(ds,1) ; dd[1] += (x[i] - d.mean) * ds / (d.std*d.std) ; end ;
+									      for i in 1:size(ds,1) ; dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds ; end )
 @dfunc logpdf(d::Normal, x::Real)    x   dx += (d.mean - x) / (d.std * d.std) * ds
 @dfunc logpdf(d::Normal, x::Array)   x   for i in 1:length(ds) ; dx[i] += (d.mean - x[i]) / (d.std * d.std) * ds[i] ; end
 
@@ -294,7 +294,7 @@ end
 
 @dfunc logpdf(d::Bernoulli, x::Real)           d   dd[1] += 1. / (d.p1 - 1. + x) * ds
 @dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd[1] += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
-@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd[i,1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
+@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(x) ; dd[i,1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
 
 import Distributions.logpdf
 
