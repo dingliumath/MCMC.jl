@@ -464,7 +464,6 @@ module Abcd
 			backwardSweep!(m)
 
 			body = Expr[] # list of = expr making the model
-			dsym(v::Symbol) = dprefix(v)
 
 			# initialization statements 
 			body = [ betaAssign(m)...,              # assigments beta vector -> model parameter vars
@@ -480,11 +479,11 @@ module Abcd
 				elseif 	isa(vh, LLAcc)
 					push!(body, :($dsym = 0.) )
 				elseif 	isa(vh, Array{Float64})
-					push!(body, :($dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
+					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
 				elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :($dsym = zeros(2)))
+					push!(body, :( $dsym = zeros(2)))
 				elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :($dsym = zeros(Float64, $(Expr(:tuple,size(vh)...,2)) )) )
+					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...,2))) ) )
 				else
 					error("[generateModelFunction] invalid gradient var type $v $(typeof(vh))")
 				end
@@ -524,7 +523,7 @@ module Abcd
 			for p in keys(m.pars)
 				v = m.pars[p]
 				dsymp = dprefix(p)
-				
+
 				if length(v.dims) == 0  # scalar
 					push!(body, :( $gsym[ $(v.pos) ] = $dsymp ) )
 				elseif length(v.dims) == 1  # vector

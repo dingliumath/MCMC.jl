@@ -183,8 +183,7 @@ MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
     end
 
 
-#####  version générée ###
-
+#####  version générée  defs  ###
 	type OutOfSupportError <: Exception ; end
 
 	immutable LLAcc
@@ -197,20 +196,21 @@ MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
 	+(ll::LLAcc, x::Real) = LLAcc(ll.val + x)
 	+(ll::LLAcc, x::Array{Float64}) = LLAcc(ll.val + sum(x))
 
-import Distributions.logpdf
-function logpdf{T<:Distribution}(ds::Array{T}, x::Union(Array, BitArray))
-	res = Array(Float64, size(ds))
-	assert( size(ds) == size(x), "x and distributions sizes do not match")
-	for i in 1:length(x)
-		res[i] = logpdf(ds[i], x[i])
-	end
-	res
-end
+    import Distributions.logpdf
+    function logpdf{T<:Distribution}(ds::Array{T}, x::Union(Array, BitArray))
+    	res = Array(Float64, size(ds))
+    	assert( size(ds) == size(x), "x and distributions sizes do not match")
+    	for i in 1:length(x)
+    		res[i] = logpdf(ds[i], x[i])
+    	end
+    	res
+    end
 
-import Distributions.Bernoulli
-Bernoulli(ps::Array{Float64}) = map(Bernoulli, ps)
+    import Distributions.Bernoulli
+    Bernoulli(ps::Array{Float64}) = map(Bernoulli, ps)
 
-__beta = zeros(nbeta)
+#####  version générée  defs  ###
+    __beta = zeros(nbeta)
 	let 
         global __ll3
         local X = Main.X
@@ -291,6 +291,9 @@ _ll1(zeros(nbeta))
 		end
 	end  # 0.75 sec
 
+
+
+
 using Base.LinAlg.BLAS
 using NumericExtensions
 
@@ -307,6 +310,8 @@ function f2()
 end
 @time f2() ;  # 0.22 sec
 
+
+Bernoulli
 
 __ll3(zeros(nbeta))
 function f3()

@@ -41,54 +41,6 @@ f([0.5])[1] - f([0.5001])[1]
 Abcd.debug(ex, y = [0.5, 0.2])
 f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=[0.5, 0.2])
 
-
-test{T<:Distribution}(ds::Array{T}) = "ok"
-test(ds::Array) = "array"
-test2(ds::Array{Distribution}) = "array2"
-test3(ds::Array{Distributions.Bernoulli}) = "array2"
-
-test(z)
-test2(z)
-test3(z)
-
-isa(Distributions.Bernoulli, Distribution)
-
-
-
-using Base.LinAlg.BLAS
-
-                a = zeros(3)
-                _acc = LLAcc(0.0)
-                _d_acc1259 = 1.0
-                _da = zeros(Float64,(3,))
-                _dtmp1258 = zeros(Float64,(1,))
-                tmp1258 = *(b,a)
-                _acc1259 = +(_acc,tmp1258)
-                for i = 1:length(tmp1258) # line 40:
-                    _dtmp1258[i] += _d_acc1259
-                end
-                gemm!('T','N',1.0,b, _dtmp1258,1.0,_da)
-                local _d_beta = similar(_beta)
-                _d_beta[1:3] = _da
-
-[_dtmp1258 ]
-Abcd.vhint[symbol("##tmp#1250")]
-length(Abcd.vhint[symbol("##tmp#1250")])
-_da = zeros(Float64,(3,))
-gemm!('T','N', 1.0, b, [1], 1.0,_da)
-
-
-
-a
-b
-let
-	a = 12
-	b = a + 4
-	println(b)
-end
-
-
-
 ################
 
 # simulate dataset
@@ -113,15 +65,84 @@ f, t1, t2, t3 = Abcd.generateModelFunction(ex, vars=zeros(nbeta), gradient=true)
 f(t3)
 
 
+##########
+	let 
+        global __ll_351
+        local X = Main.X
+        local Y = Main.Y
+        function __ll_351(_beta::Vector{Float64})
+            try 
+                vars = _beta[1:10]
+                vars = zeros(nbeta)
+                _acc = LLAcc(0.0)
+                _d___acc_349 = 1.0
+                _d__tmp_342 = zeros(Float64,(10,))
+                _d__tmp_346 = zeros(Float64,(1000,2))
+                _d___acc_348 = 0.0
+                _d__tmp_344 = zeros(Float64,(1000,))
+                _d__tmp_347 = zeros(Float64,(1000,))
+                _d__tmp_345 = zeros(Float64,(1000,))
+                _d__tmp_343 = zeros(Float64,(1000,))
+                _dvars = zeros(Float64,(10,))
+                _dprob = zeros(Float64,(1000,))
+                __tmp_341 = Normal(0,1.0)
+                __tmp_342 = logpdf(__tmp_341,vars)
+                ___acc_348 = +(_acc,__tmp_342)
+                __tmp_343 = *(X,vars)
+                __tmp_344 = exp(__tmp_343)
+                __tmp_345 = +(1.0,__tmp_344)
+                prob = /(1,__tmp_345)
+                __tmp_346 = Abcd.Bernoulli(prob)
+                __tmp_347 = Abcd.logpdf(__tmp_346,Y)
+                ___acc_349 = +(___acc_348,__tmp_347)
+                _d___acc_348 += _d___acc_349
+                for i = 1:length(__tmp_347) 
+                    _d__tmp_347[i] += _d___acc_349
+                end
+                for i = 1:length(_d__tmp_347) 
+                    _d__tmp_346[i,1] += *(/(1.0,+(-(__tmp_346[i].p1,1.0),Y[i])),_d__tmp_347[i])
+                end
+                for i = 1:length(_d__tmp_346)
+                    _dprob[i] = _d__tmp_346[i,1]
+                end
+                for i = 1:length(_dprob)
+                    _d__tmp_345[i] -= /(*(1,_dprob[i]),*(__tmp_345[i],__tmp_345[i]))
+                end
+                for i = 1:length(_d__tmp_345)
+                    _d__tmp_344[i] += _d__tmp_345[i]
+                end
+                for i = 1:length(_d__tmp_344) 
+                    _d__tmp_343[i] += *(exp(__tmp_343[i]),_d__tmp_344[i])
+                end
+                gemm!('T','N',1.0,X,reshape(_d__tmp_343,length(_d__tmp_343),1),1.0,_dvars)
+                for i = 1:length(__tmp_342) 
+                    _d__tmp_342[i] += _d___acc_348
+                end
+                for i = 1:length(_d__tmp_342)
+                    _dvars[i] += *(/(-(__tmp_341.mean,vars[i]),*(__tmp_341.std,__tmp_341.std)),_d__tmp_342[i])
+                end
+                local _d_beta = similar(_beta)
+                _d_beta[1:10] = _dvars
+                (___acc_349.val,_d_beta)
+            catch e 
+                if isa(e,OutOfSupportError)
+                    return (-(Inf),zero(_beta))
+                else  
+                    throw(e)
+                end
+            end
+        end
+    end
+
+
+
 using Distributions
 
 myex = Abcd.d_Bernoulli_x1([Distributions.Bernoulli(x) for x in [0.1,0.2]])
 
+tmp = Abcd.Bernoulli([0.5, 0.2, 0.3])
 
-		smap = { symbol("x$i") => args[i] for i in 1:length(args)}
-		smap[:ds] = ds
-		smap[:dacc] = symbol("$DERIV_PREFIX$vs")
-
+tmp[1].p1
 
 ex2 = quote
 	vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
