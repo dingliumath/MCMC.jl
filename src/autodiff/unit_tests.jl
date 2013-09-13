@@ -58,10 +58,10 @@ testedmod = Abcd
 @test testedmod.getSymbols(:(if x >= 4 & y < 5 || w == 3; return y <= x ; end)) == Set(:x, :y, :w)
 
 
-
 ## variable subsitution function
 smap = Dict()
 @test testedmod.substSymbols(:(a+b), smap)             == :(a+b)
+
 smap = {:a => :x, :b => :y}
 @test testedmod.substSymbols(:a, smap)                 == :x
 @test testedmod.substSymbols(:(a+b), smap)             == :(x+y)
@@ -73,5 +73,5 @@ smap = {:a => :x, :b => :y}
 @test testedmod.substSymbols(:(z.a), smap)             == :(z.a)  # note : no subst on field names
 @test testedmod.substSymbols(:(z.a[x]), smap)          == :(z.a[x])  # note : no subst on field names
 @test testedmod.substSymbols(:(z[x].a), smap)          == :(z[x].a)  # note : no subst on field names
-
+@test testedmod.substSymbols(:(a[x].z), smap)          == :(x[x].z)  # note : no subst on field names
 

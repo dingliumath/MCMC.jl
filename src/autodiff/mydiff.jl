@@ -13,8 +13,12 @@ macro dfunc(func::Expr, dv::Symbol, diff::Expr)
 
 	# change var names in signature and diff expr to x1, x2, x3, ..
 	smap = { argsn[i] => symbol("x$i") for i in 1:length(argsn) }
+	# symbols for distributions
+	smap[ symbol("d$dv")] = symbol("dacc") 
+	smap[ symbol("d$dv1")] = symbol("dacc1") 
+	smap[ symbol("d$dv2")] = symbol("dacc2") 
+
 	args2 = substSymbols(func.args[2:end], smap)
-	smap[ symbol("d$dv")] = symbol("dacc")  ################
 
 	# diff function name
 	fn = symbol("d_$(func.args[1])_x$index")
@@ -184,13 +188,14 @@ end
 # # @dfunc logpdfNormal(mu, sigma::Array, x)   sigma  ((x - mu).*(x - mu) ./ (sigma.*sigma) - 1.) ./ sigma * ds
 # # @dfunc logpdfNormal(mu, sigma, x::Real)    x      sum((mu - x) ./ (sigma .* sigma)) * ds
 # # @dfunc logpdfNormal(mu, sigma, x::Array)   x      (mu - x) ./ (sigma .* sigma) * ds
-@dfunc Normal(x1, x2)    x1     dx1 = ds[1]
-@dfunc Normal(x1, x2)    x2     dx2 = ds[2]
+@dfunc Normal(mu, std)    mu     dmu = ds1
+@dfunc Normal(mu, std)    std    dstd = ds2
 
-@dfunc logpdf(d::Normal, x::Real)    d  ( dd[1] += (x - d.mean) * ds / (d.std*d.std) ;
-										  dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
-@dfunc logpdf(d::Normal, x::Array)   d  ( for i in 1:length(ds) ; dd[1] += (x[i] - d.mean) * ds / (d.std*d.std) ; end ;
-									      for i in 1:length(ds) ; dd[2] += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds ; end )
+@dfunc logpdf(d::Normal, x::Real)    d  ( dd1 += (x - d.mean) * ds / (d.std*d.std) ;
+										  dd2 += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
+@dfunc logpdf(d::Normal, x::Array)   d  ( for i in 1:size(ds,1) ; dd1 += (x[i] - d.mean) * ds / (d.std*d.std) ; end ;
+									      for i in 1:size(ds,1) ; dd2 += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds ; end )
+
 @dfunc logpdf(d::Normal, x::Real)    x   dx += (d.mean - x) / (d.std * d.std) * ds
 @dfunc logpdf(d::Normal, x::Array)   x   for i in 1:length(ds) ; dx[i] += (d.mean - x[i]) / (d.std * d.std) * ds[i] ; end
 
@@ -280,7 +285,6 @@ end
 # @dfunc logpdfLogNormal(lmu, lsc::Array, x)  lsc  ( tmp2=lsc.*lsc ; ( (lmu.*lmu - tmp2 - log(x).*(2lmu-log(x))) ./ (lsc.*tmp2) ) .* ds )
 
 
-
 # # TODO : find a way to implement multi variate distribs that goes along well with vectorization (Dirichlet, Categorical)
 # # TODO : other continuous distribs ? : Pareto, Rayleigh, Logistic, Levy, Laplace, Dirichlet, FDist
 # # TODO : other discrete distribs ? : NegativeBinomial, DiscreteUniform, HyperGeometric, Geometric, Categorical
@@ -289,12 +293,12 @@ end
 # @dfunc logpdfBernoulli(p::Real, x)     p     sum(1. ./ (p - (1. - x))) * ds
 # @dfunc logpdfBernoulli(p::Array, x)    p     (1. ./ (p - (1. - x))) * ds
 
-@dfunc Bernoulli(a::Real)         a       da = ds[1]
-@dfunc Bernoulli(a::Array)        a       for i in 1:length(ds) ; da[i] = ds[i,1] ; end
+@dfunc Bernoulli(p::Real)        p       dp = ds1
+@dfunc Bernoulli(p::Array)       p       for i in 1:length(ds) ; da[i] = ds[i,1] ; end
 
 @dfunc logpdf(d::Bernoulli, x::Real)           d   dd[1] += 1. / (d.p1 - 1. + x) * ds
 @dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd[1] += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
-@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd[i,1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
+@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(x) ; dd[i,1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
 
 import Distributions.logpdf
 

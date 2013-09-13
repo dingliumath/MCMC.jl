@@ -41,13 +41,15 @@ module Abcd
 	getSymbols(ex::Exprdot) =     Set{Symbol}(ex.args[1])  # return variable, not fields
 
 	## variable symbol subsitution functions
-	substSymbols(ex::Expr, smap::Dict) =          substSymbols(toExprH(ex), smap::Dict)
-	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
-	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
-	substSymbols(ex::Symbol, smap::Dict) =        haskey(smap, ex) ? smap[ex] : ex
-	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
 	substSymbols(ex::Any, smap::Dict) =           ex
-	substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = get(smap, ex.args[1], ex.args[1]) ; toExpr(ex) )
+	substSymbols(ex::Expr, smap::Dict) =          substSymbols(toExprH(ex), smap::Dict)
+	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
+	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
+	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
+	# substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = get(smap, ex.args[1], ex.args[1]) ; toExpr(ex) )
+	substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = substSymbols(ex.args[1], smap) ; toExpr(ex) )
+	# substSymbols(ex::Symbol, smap::Dict) =        haskey(smap, ex) ? smap[ex] : ex
+	substSymbols(ex::Symbol, smap::Dict) =        get(smap, ex, ex)
 
 	
 	# naming conventions + functions
@@ -462,26 +464,26 @@ module Abcd
 			backwardSweep!(m)
 
 			body = Expr[] # list of = expr making the model
-			dsym(v::Symbol) = dprefix(v)
 
 			# initialization statements 
 			body = [ betaAssign(m)...,              # assigments beta vector -> model parameter vars
 			         :($ACC_SYM = LLAcc(0.)),       # initialize accumulator
-			         :($(dsym(m.finalacc)) = 1.0)]  # initialize accumulator gradient accumulator  
+			         :($(dprefix(m.finalacc)) = 1.0)]  # initialize accumulator gradient accumulator  
 
 			avars = setdiff(intersect(m.accanc, m.pardesc), Set(m.finalacc)) # active vars without accumulator, treated above  
 			for v in avars 
 				vh = vhint[v]
+				dsym = dprefix(v)
 				if isa(vh, Real)
-					push!(body, :($(dsym(v)) = 0.) )
+					push!(body, :($dsym = 0.) )
 				elseif 	isa(vh, LLAcc)
-					push!(body, :($(dsym(v)) = 0.) )
+					push!(body, :($dsym = 0.) )
 				elseif 	isa(vh, Array{Float64})
-					push!(body, :($(dsym(v)) = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
+					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
 				elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :($(dsym(v)) = zeros(2)))
+					push!(body, :( $dsym = zeros(2)))
 				elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :($(dsym(v)) = zeros(Float64, $(Expr(:tuple,size(vh)...,2)) )) )
+					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...,2))) ) )
 				else
 					error("[generateModelFunction] invalid gradient var type $v $(typeof(vh))")
 				end
@@ -516,19 +518,20 @@ module Abcd
 
 			# return statement (note : gradient vec should match beta variable mapping)
 			# dexp = { :( vec([$(dsym(p.sym))]) ) for p in m.pars}
-			gsym = dsym(PARAM_SYM)
+			gsym = dprefix(PARAM_SYM)
 			push!(body, :( local $gsym = similar($PARAM_SYM)))
 			for p in keys(m.pars)
 				v = m.pars[p]
+				dsymp = dprefix(p)
 
 				if length(v.dims) == 0  # scalar
-					push!(body, :( $gsym[ $(v.pos) ] = $(dsym(p)) ) )
+					push!(body, :( $gsym[ $(v.pos) ] = $dsymp ) )
 				elseif length(v.dims) == 1  # vector
 					r = v.pos:(v.pos+prod(v.dims)-1)
-					push!(body, :( $gsym[ $(Expr(:quote,r)) ] = $(dsym(p)) ) )
+					push!(body, :( $gsym[ $(Expr(:quote,r)) ] = $dsymp ) )
 				else # matrix case  (needs a reshape)
 					r = v.pos:(v.pos+prod(v.dims)-1)
-					push!(body, :( $gsym[ $(Expr(:quote,r)) ] = vec($(dsym(p))) ))
+					push!(body, :( $gsym[ $(Expr(:quote,r)) ] = vec($dsymp) ))
 				end
 			end
 			push!(body, :( ($(Expr(:., m.finalacc, Expr(:quote, :val))), $gsym) ) )
