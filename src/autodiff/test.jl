@@ -1,10 +1,13 @@
-cd("p:/Documents/julia/MCMC.jl/src/autodiff")
-cd("~/devl/MCMC.jl/src/autodiff")
-pwd()
 
-@windows_only include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
-@unix_only include("/home/fredo/devl/MCMC.jl/src/autodiff/mymod.jl")
-
+@windows_only begin
+    cd("p:/Documents/julia/MCMC.jl.fredo/src/autodiff")
+    include("mymod.jl")
+    include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
+end
+@unix_only begin
+    cd("~/devl/MCMC.jl/src/autodiff")
+    include("/home/fredo/devl/MCMC.jl/src/autodiff/mymod.jl")
+end
 
 ######
 
@@ -35,11 +38,29 @@ y = 0.5
 x = 1.0
 ex = :( x ~ Bernoulli(y) )
 Abcd.debug(ex, y = 0.5)
+Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
 f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
-f([0.5])[1] - f([0.5001])[1]
+f([0.5])
+(f([0.5001])[1] - f([0.5])[1])*10000
 
-Abcd.debug(ex, y = [0.5, 0.2])
-f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=[0.5, 0.2])
+x = [1.0, 0, 1, 1]
+ex = :( x ~ Bernoulli(y) )
+Abcd.debug(ex, y = 0.5)
+Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
+f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
+f([0.5])
+(f([0.5001])[1] - f([0.5])[1])*10000
+
+
+x = [1.0, 0, 1, 1]
+ex = :( x ~ Bernoulli(y) )
+Abcd.debug(ex, y = [0.1:0.1:0.4])
+Abcd.generateModelFunction(ex, gradient=true, y=[0.1:0.1:0.4], debug=true)
+f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=[0.1:0.1:0.4])
+f([0.1:0.1:0.4])
+(f([0.5001])[1] - f([0.5])[1])*10000
+
+
 
 ################
 

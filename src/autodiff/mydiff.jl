@@ -15,8 +15,8 @@ macro dfunc(func::Expr, dv::Symbol, diff::Expr)
 	smap = { argsn[i] => symbol("x$i") for i in 1:length(argsn) }
 	# symbols for distributions
 	smap[ symbol("d$dv")] = symbol("dacc") 
-	smap[ symbol("d$dv1")] = symbol("dacc1") 
-	smap[ symbol("d$dv2")] = symbol("dacc2") 
+	smap[ symbol("d$(dv)1")] = symbol("dacc1")  # notation for Distributions fields derivatives
+	smap[ symbol("d$(dv)2")] = symbol("dacc2")  # notation for Distributions fields derivatives
 
 	args2 = substSymbols(func.args[2:end], smap)
 
@@ -80,7 +80,6 @@ end
 @dfunc cos(x::Array)       x     for i in 1:length(ds) ; dx[i] -= sin(x[i]) * ds[i] ;end
 
 # abs, max(), min()
-# @dfunc abs(x)       x     sign(x) .* ds
 @dfunc abs(x::Real )       x     dx += sign(x) * ds
 @dfunc abs(x::Array)       x     for i in 1:length(ds) ; dx[i] += sign(x[i]) * ds[i] ;end
 
@@ -120,10 +119,6 @@ end
 @dfunc *(x::Array, y::Array)   y     gemm!('T', 'N', 1., x, ds, 1., dy)
 
 # dot multiplication
-# @dfunc .*(x::Real, y)    x     sum(ds .* y)
-# @dfunc .*(x::Array, y)   x     ds .* y
-# @dfunc .*(x, y::Real)    y     sum(ds .* x)
-# @dfunc .*(x, y::Array)   y     ds .* x
 @dfunc .*(x::Real , y::Real )   x     dx += y .* ds
 @dfunc .*(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += y[i] * ds[i] ; end
 @dfunc .*(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += y * ds[i] ; end
@@ -150,10 +145,6 @@ end
 @dfunc .^(x::Array, y::Array)    y     for i in 1:length(ds) ; dy[i] += log(x[i]) * x[i] ^ y[i] * ds[i] ; end
 
 # division
-# @dfunc /(x::Real, y)          x     sum(ds ./ y)
-# @dfunc /(x::Array, y::Real)   x     ds ./ y
-# @dfunc /(x, y::Real)          y     sum(- x ./ (y .* y) .* ds)
-# @dfunc /(x::Real, y::Array)   y     (- x ./ (y .* y)) .* ds
 @dfunc /(x::Real , y::Real )   x     dx += ds / y
 @dfunc /(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += ds[i] / y[i] ; end
 @dfunc /(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += ds[i] / y ; end
@@ -163,10 +154,6 @@ end
 @dfunc /(x::Array, y::Real )   y     for i in 1:length(ds) ; dy -= x[i] * ds[i] / (y * y); end
 
 # dot division
-# @dfunc ./(x::Real, y)        x     sum(ds ./ y)
-# @dfunc ./(x::Array, y)       x     ds ./ y
-# @dfunc ./(x, y::Real)        y     sum(- x ./ (y .* y) .* ds)
-# @dfunc ./(x, y::Array)       y     (- x ./ (y .* y)) .* ds
 @dfunc ./(x::Real , y::Real )   x     dx += ds / y
 @dfunc ./(x::Real , y::Array)   x     for i in 1:length(ds) ; dx += ds[i] / y[i] ; end
 @dfunc ./(x::Array, y::Real )   x     for i in 1:length(ds) ; dx[i] += ds[i] / y ; end
@@ -294,11 +281,11 @@ end
 # @dfunc logpdfBernoulli(p::Array, x)    p     (1. ./ (p - (1. - x))) * ds
 
 @dfunc Bernoulli(p::Real)        p       dp = ds1
-@dfunc Bernoulli(p::Array)       p       for i in 1:length(ds) ; da[i] = ds[i,1] ; end
+@dfunc Bernoulli(p::Array)       p       for i in 1:length(ds1) ; dp[i] = ds1[i] ; end
 
-@dfunc logpdf(d::Bernoulli, x::Real)           d   dd[1] += 1. / (d.p1 - 1. + x) * ds
-@dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd[1] += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
-@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(x) ; dd[i,1] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
+@dfunc logpdf(d::Bernoulli, x::Real)           d   dd1 += 1. / (d.p1 - 1. + x) * ds
+@dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd1 += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
+@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd1[i] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
 
 import Distributions.logpdf
 
@@ -318,9 +305,6 @@ Bernoulli(ps::Array{Float64}) = map(Bernoulli, ps)
 # @dfunc logpdfBinomial(n, p::Real, x)   p    sum(x ./ p - (n-x) ./ (1 - p)) * ds
 # @dfunc logpdfBinomial(n, p::Array, x)  p    (x ./ p - (n-x) ./ (1 - p)) * ds
 
-
-
-
 # ## Poisson distribution (Note : no derivation on x parameter as it is an integer)
 # @dfunc logpdfPoisson(lambda::Real, x)   lambda   sum(x ./ lambda - 1) * ds
 # @dfunc logpdfPoisson(lambda::Array, x)  lambda   (x ./ lambda - 1) * ds
@@ -339,7 +323,7 @@ end
 ## Returns gradient expression of opex
 function derive(opex::Expr, index::Integer, dsym::Union(Expr,Symbol))  # opex=:(z^x);index=2;dsym=:y
 	vs = opex.args[1+index]
-	ds = symbol("$DERIV_PREFIX$dsym")
+	ds = dprefix(dsym)
 	args = opex.args[2:end]
 	
 	val = map(hint, args)  # get sample values of args to find correct gradient statement
@@ -351,20 +335,16 @@ function derive(opex::Expr, index::Integer, dsym::Union(Expr,Symbol))  # opex=:(
 
 		smap = { symbol("x$i") => args[i] for i in 1:length(args)}
 		smap[:ds] = ds
-		smap[:dacc] = symbol("$DERIV_PREFIX$vs")
+		smap[:ds1] = symbol("$(ds)#1")
+		smap[:ds2] = symbol("$(ds)#2")
+		smap[:dacc] = dprefix(vs)
+		smap[:dacc1] = dprefix("$(vs)#1")
+		smap[:dacc2] = dprefix("$(vs)#2")
 		dexp = substSymbols(dexp, smap)
 
 		return dexp
-		# unfold for easier optimization later
-	 #    m = ParsingStruct()
-	 #    m.source = :(dummy = $dexp )
-		# unfold!(m)  
-		# m.exprs[end] = m.exprs[end].args[2] # remove last assignment
-
-		# m.exprs[end] = :( $(symbol("$DERIV_PREFIX$vs")) = $(symbol("$DERIV_PREFIX$vs")) + $(m.exprs[end]) )
-		# return m.exprs
 	catch e 
-		error("[derive] Doesn't know how to derive $opex by argument $vs")
+		error("[derive] Failed to derive $opex by argument $vs ($(typeof(val[1+index])))")
 	end
 
 end
