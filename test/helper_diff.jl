@@ -34,7 +34,8 @@ end
 
 
 ## argument pattern generation for testing
-# all args can be scalar, vector or matrices, but with compatible dimensions (i.e same size for arrays)
+# all args can be scalar, vector or matrices, 
+#   but without mixing vector and matrices
 function testpattern1(nb)
 	ps = [ ifloor((i-1) / 2^(j-1)) % 2 for i=1:2^nb, j=1:nb]
 	vcat(ps, 2*ps[2:end,:])
@@ -48,6 +49,14 @@ testpattern4(nb) = fill(2, 1, nb) # all args are matrices
 function testpattern5(nb)
 	ps = testpattern1(nb)
 	ps[(ps.>0) * ones(nb) .<= 1, :]
+end
+
+# for logpdfs : all args can be scalar, vector or matrices, 
+#   but without mixing vector and matrices
+#   AND same type for distribution params
+function testpattern6(nb)
+	ps = testpattern1(nb)
+	ps[ps[:,1] (ps[:, 1:(end-1)].>0) * ones(nb) .<= 1, :]
 end
 
 ## runs arg dimensions combinations

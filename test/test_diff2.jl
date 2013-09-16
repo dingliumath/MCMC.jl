@@ -60,6 +60,7 @@ deriv1(:(v2ref[:,1:2]*x), [-3. 2 0 ; 1 1 -2])
 # @mtest testpattern1 logpdfNormal(mu,sigma,x)  sigma->sigma<=0?0.1:sigma
 @mtest testpattern2 logpdf(Normal(mu, sigma), 2)  sigma->sigma<=0?0.1:sigma
 @mtest testpattern1 logpdf(Normal(1., 0.5), x)   
+@mtest testpattern1 logpdf(Normal(mu, sigma), x)   
 
 # @mtest testpattern1 logpdfUniform(a,b,x)      a->a-10 b->b+10
 @mtest testpattern2 logpdf(Uniform(a, b), 2)     a->a-10 b->b+10
@@ -80,6 +81,7 @@ deriv1(:(v2ref[:,1:2]*x), [-3. 2 0 ; 1 1 -2])
 # note for Bernoulli : having prob=1 or 0 is ok but will make the numeric differentiator fail => not tested
 # @mtest testpattern1 logpdfBernoulli(prob,x)   exceptLast prob->clamp(prob, 0.01, 0.99) x->(x>0)+0. 
 @mtest testpattern2 logpdf(Bernoulli(prob),x)   exceptLast prob->clamp(prob, 0.01, 0.99) x->(x>0)+0. 
+@mtest testpattern2 logpdf(Bernoulli(prob),x)   exceptLast prob->clamp(prob, 0.01, 0.99) x->(x>0) 
 
 @mtest testpattern1 logpdfPoisson(l,x)   exceptLast l->l<=0?0.1:l x->iround(abs(x)) 
 @mtest testpattern1 logpdfBinomial(n, prob,x)   exceptFirstAndLast prob->clamp(prob, 0.01, 0.99) x->iround(abs(x)) n->iround(abs(n)+10)

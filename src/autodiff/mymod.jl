@@ -46,9 +46,7 @@ module Abcd
 	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
 	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
 	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
-	# substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = get(smap, ex.args[1], ex.args[1]) ; toExpr(ex) )
 	substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = substSymbols(ex.args[1], smap) ; toExpr(ex) )
-	# substSymbols(ex::Symbol, smap::Dict) =        haskey(smap, ex) ? smap[ex] : ex
 	substSymbols(ex::Symbol, smap::Dict) =        get(smap, ex, ex)
 
 	
@@ -66,6 +64,16 @@ module Abcd
 	isSymbol(ex)   = isa(ex, Symbol)
 	isDot(ex)      = isa(ex, Expr) && ex.head == :.   && isa(ex.args[1], Symbol)
 	isRef(ex)      = isa(ex, Expr) && ex.head == :ref && isa(ex.args[1], Symbol)
+
+	# var name generator
+	let
+		vcount = Dict()
+		global newvar
+		function newvar(radix::Union(String, Symbol)="")
+			vcount[radix] = haskey(vcount, radix) ? vcount[radix]+1 : 1
+			return symbol("$radix#$(vcount[radix])")
+		end
+	end
 
 	immutable PDims
 		pos::Integer   # starting position of parameter in the parameter vector
@@ -216,7 +224,7 @@ module Abcd
 			for e2 in args  
 				if isa(e2, Expr) # only refs and calls will work
 					ue = explore(e2)
-					nv = gensym(TEMP_NAME)
+					nv = newvar(TEMP_NAME)
 					push!(m.exprs, :($nv = $ue))
 					push!(na, nv)
 				else
@@ -245,7 +253,7 @@ module Abcd
 	        # second, rename lhs symbol if set before
 	        lhs = collect(getSymbols(el[idx].args[1]))[1]  # there should be only one
 	        if contains(used, lhs) # if var already set once => create a new one
-	            subst[lhs] = gensym("$lhs") # generate new name, add it to substitution list for following statements
+	            subst[lhs] = newvar(lhs) # generate new name, add it to substitution list for following statements
 	            el[idx].args[1] = substSymbols(el[idx].args[1], subst)
 	        else # var set for the first time
 	            union!(used, Set(lhs)) 
@@ -421,7 +429,7 @@ module Abcd
 		vhooks = Expr(:block, [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]...) # assigment block
 
 		# build and evaluate the let block containing the function and external vars hooks
-		fn = gensym()
+		fn = newvar()
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = :(let; global $fn; $vhooks; $body; end)
 		
@@ -481,9 +489,12 @@ module Abcd
 				elseif 	isa(vh, Array{Float64})
 					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
 				elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :( $dsym = zeros(2)))
+					push!(body, :( $(symbol("$dsym#1")) = 0. ) )
+					push!(body, :( $(symbol("$dsym#2")) = 0. ) )
 				elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...,2))) ) )
+					push!(body, :( $(symbol("$dsym#1")) = zeros(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+					push!(body, :( $(symbol("$dsym#2")) = zeros(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+					# push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...,2))) ) )
 				else
 					error("[generateModelFunction] invalid gradient var type $v $(typeof(vh))")
 				end
@@ -566,7 +577,7 @@ module Abcd
 		header = [[ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]..., header...] # assigment block
 
 		# build and evaluate the let block containing the function and external vars hooks
-		fn = gensym("ll")
+		fn = newvar(:ll)
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = Expr(:let, Expr(:block, :(global $fn), header..., body))
 

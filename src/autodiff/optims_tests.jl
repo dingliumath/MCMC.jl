@@ -210,70 +210,73 @@ MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
     Bernoulli(ps::Array{Float64}) = map(Bernoulli, ps)
 
 #####  version générée  defs  ###
+Y = float64(Y)
+Abcd.generateModelFunction(ex, gradient=true, vars=zeros(nbeta), debug=true)
+
+
     __beta = zeros(nbeta)
-	let 
-        global __ll3
+    let 
+        global _ll3
         local X = Main.X
         local Y = Main.Y
-        function __ll3(__beta::Vector{Float64})
+        function _ll3(_beta::Vector{Float64})
             try 
-                vars = __beta[1:10]
-                __acc = LLAcc(0.0)
-                d____acc_557 = 1.0
-                d__tmp_553 = zeros(Float64,(1000,))
-                d__tmp_555 = zeros(Float64,(1000,))
-                d__tmp_551 = zeros(Float64,(1000,))
-                d____acc_556 = 0.0
-                d__tmp_552 = zeros(Float64,(1000,))
-                dvars = zeros(Float64,(10,))
-                d__tmp_554 = zeros(Float64,(1000,2))
-                d__tmp_550 = zeros(Float64,(10,))
-                dprob = zeros(Float64,(1000,))
-                __tmp_549 = Normal(0,1.0)
-                __tmp_550 = logpdf(__tmp_549,vars)
-                ____acc_556 = +(__acc,__tmp_550)
-                __tmp_551 = *(X,vars)
-                __tmp_552 = exp(__tmp_551)
-                __tmp_553 = +(1.0,__tmp_552)
-                prob = /(1,__tmp_553)
-                __tmp_554 = Bernoulli(prob)
-                __tmp_555 = logpdf(__tmp_554,Y)
-                ____acc_557 = +(____acc_556,__tmp_555)
-                d____acc_556 += d____acc_557
-                for i = 1:length(d____acc_557) 
-                    d__tmp_555[i] += d____acc_557[i]
+                vars = _beta[1:10]
+                _acc = LLAcc(0.0)
+                _d_acc_216 = 1.0
+                _dtmp_289 = zeros(Float64,(1000,))
+                _dtmp_285 = zeros(Float64,(1000,))
+                _dtmp_286 = zeros(Float64,(1000,))
+                _dtmp_288_1 = zeros(Float64,(1000,))
+                _dtmp_288_2 = zeros(Float64,(1000,))
+                _dtmp_284 = zeros(Float64,(10,))
+                _d_acc_215 = 0.0
+                _dvars = zeros(Float64,(10,))
+                _dtmp_287 = zeros(Float64,(1000,))
+                _dprob = zeros(Float64,(1000,))
+                tmp_283 = Normal(0,1.0)
+                tmp_284 = logpdf(tmp_283,vars)
+                _acc_215 = +(_acc,tmp_284)
+                tmp_285 = *(X,vars)
+                tmp_286 = exp(tmp_285)
+                tmp_287 = +(1.0,tmp_286)
+                prob = /(1,tmp_287)
+                tmp_288 = Bernoulli(prob)
+                tmp_289 = logpdf(tmp_288,Y)
+                _acc_216 = +(_acc_215,tmp_289)
+                _d_acc_215 += _d_acc_216
+                for i = 1:length(tmp_289) 
+                    _dtmp_289[i] += _d_acc_216
                 end
-                __tmp_554[1].p1
-                i = 1
-                for i = 1:length(d__tmp_555)
-                    d__tmp_554[i,1] += *(/(1.0,+(-((__tmp_554[i]).p1,1.0),Y[i])),d__tmp_555[i])
+                for i = 1:length(_dtmp_289) 
+                    _dtmp_288_1[i] += *(/(1.0,+(-(tmp_288[i].p1,1.0),Y[i])),_dtmp_289[i])
                 end
-                for i = 1:size(d__tmp_554,1) 
-                    dprob[i] = d__tmp_554[i,1]
+                for i = 1:length(_dtmp_288_1)
+                    _dprob[i] = _dtmp_288_1[i]
                 end
-                for i = 1:length(dprob)
-                    d__tmp_553[i] -= /(*(1,dprob[i]),*(__tmp_553[i],__tmp_553[i]))
+                for i = 1:length(_dprob) 
+                    _dtmp_287[i] -= /(*(1,_dprob[i]),*(tmp_287[i],tmp_287[i]))
                 end
-                for i = 1:length(d__tmp_553)
-                    d__tmp_552[i] += d__tmp_553[i]
+                for i = 1:length(_dtmp_287)
+                    _dtmp_286[i] += _dtmp_287[i]
                 end
-                for i = 1:length(d__tmp_552)
-                    d__tmp_551[i] += *(exp(__tmp_551[i]),d__tmp_552[i])
+                for i = 1:length(_dtmp_286) 
+                    _dtmp_285[i] += *(exp(tmp_285[i]),_dtmp_286[i])
                 end
-                gemm!('T','N',1.0,X,reshape(d__tmp_551, length(d__tmp_551),1),1.0,dvars)
-                for i = 1:length(d____acc_556) 
-                    d__tmp_550[i] += d____acc_556[i]
+                gemm!('T','N',1.0,X,reshape(_dtmp_285,length(_dtmp_285),1),1.0,_dvars)
+                for i = 1:length(tmp_284) 
+                    _dtmp_284[i] += _d_acc_215
                 end
-                for i = 1:length(d__tmp_550) 
-                    dvars[i] += *(/(-(__tmp_549.mean,vars[i]),*(__tmp_549.std,__tmp_549.std)),d__tmp_550[i])
+                for i = 1:length(_dtmp_284) 
+                    _dvars[i] += *(/(-(tmp_283.mean,vars[i]),*(tmp_283.std,tmp_283.std)),_dtmp_284[i])
                 end
-                local d__beta = similar(__beta)
-                d__beta[1:10] = dvars
-                (____acc_557.val,d__beta)
+                local _d_beta = similar(_beta)
+                _d_beta[1:10] = _dvars
+                (_acc_216.val,_d_beta)
             catch e 
                 if isa(e,OutOfSupportError) 
-                    return (-(Inf),zero(__beta))
-                else 
+                    return (-(Inf),zero(_beta))
+                else  
                     throw(e)
                 end
             end
@@ -313,7 +316,8 @@ end
 
 Bernoulli
 
-__ll3(zeros(nbeta))
+using Distributions
+_ll3(zeros(nbeta))
 function f3()
 	s = 0.
 	for i in 1:1000
