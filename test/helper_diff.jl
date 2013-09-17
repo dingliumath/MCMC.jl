@@ -35,7 +35,7 @@ end
 
 ## argument pattern generation for testing
 # all args can be scalar, vector or matrices, 
-#   but without mixing vector and matrices
+#   but without vector and matrices at the same time
 function testpattern1(nb)
 	ps = [ ifloor((i-1) / 2^(j-1)) % 2 for i=1:2^nb, j=1:nb]
 	vcat(ps, 2*ps[2:end,:])
@@ -56,7 +56,8 @@ end
 #   AND same type for distribution params
 function testpattern6(nb)
 	ps = testpattern1(nb)
-	ps[ps[:,1] (ps[:, 1:(end-1)].>0) * ones(nb) .<= 1, :]
+	ok = mapslices(v->all(v[1] .== v[2:end-1]), ps, 2)
+	ps[vec(ok), :]
 end
 
 ## runs arg dimensions combinations
