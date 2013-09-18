@@ -31,6 +31,37 @@ macro dfunc(func::Expr, dv::Symbol, diff::Expr)
 	dfunc(func, dv, diff)
 end
 
+##  for logpdf(Distrib,x)
+macro dlogpdfd(dist::Symbol, rule)
+	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
+	dfunc( sig, :d, rule ) 
+
+	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Array) )
+	rule2 = substSymbols(rule, {:x => :(x[i]), :ds => :(ds[i])})
+	dfunc( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+
+	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::Array) )
+	rule2 = substSymbols(rule, {:dd1 => :(dd1[i]), :dd2 => :(dd2[i]), :dd3 => :(dd3[i]), 
+		:x => :(x[i]), :ds => :(ds[i]), :d => :(d[i]) })
+	dfunc(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+end
+
+macro dlogpdfx(dist::Symbol, rule)
+	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
+	dfunc( sig, :x, rule ) 
+
+	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Array) )
+	rule2 = substSymbols(rule, {:dx => :(dx[i]), :x => :(x[i]), :ds => :(ds[i])})
+	dfunc( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
+
+	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::Array) )
+	rule3 = substSymbols(rule2, {:d => :(d[i])})
+	dfunc( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
+end
+
+
+
+
 ########   rules definitions   #############
 
 ## common operators
@@ -181,167 +212,80 @@ for d in [:Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :
 	dfunc(:( ($d)(p1::Array, p2::Array) ), :p2, :( copy!(dp2, ds2) ) )
 end
 
-
-# Normal distribution
-@dfunc logpdf(d::Normal, x::Real)          d  ( dd1 += (x - d.mean) * ds / (d.std*d.std) ;
-										        dd2 += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
-@dfunc logpdf(d::Normal, x::Array)         d  ( for i in 1:length(x)
-													dd1 += (x[i]-d.mean) * ds[i] / (d.std*d.std) 
-									            	dd2 += ((x[i]-d.mean)*(x[i]-d.mean)/(d.std*d.std) - 1.) / d.std * ds[i] 
-									            end )
-@dfunc logpdf(d::Array{Normal}, x::Array)  d  ( for i in 1:length(x)
-													dd1[i] += (x[i]-d[i].mean) * ds[i] / (d[i].std*d[i].std)
-									            	dd2[i] += ((x[i]-d[i].mean)*(x[i]-d[i].mean)/(d[i].std*d[i].std)-1.) / 
-									            				d[i].std * ds[i] 
-									            end )
-
-@dfunc logpdf(d::Normal, x::Real)          x   dx += (d.mean - x) / (d.std * d.std) * ds
-@dfunc logpdf(d::Normal, x::Array)         x   (for i in 1:length(ds) ; 
-													dx[i] += (d.mean - x[i]) / (d.std * d.std) * ds[i] ; 
-												end )
-@dfunc logpdf(d::Array{Normal}, x::Array)  x   (for i in 1:length(ds) ; 
-													dx[i] += (d[i].mean - x[i]) / (d[i].std * d[i].std) * ds[i] ; 
-												end )
+## Normal distribution
+@unix_only begin
+	@dlogpdfx Normal dx += (d.μ - x) / (d.σ * d.σ) * ds
+	@dlogpdfd Normal ( 	dd1 += (x - d.μ) / (d.σ*d.σ) * ds;
+						dd2 += ((x - d.μ)*(x - d.μ) / (d.σ*d.σ) - 1.) / d.σ * ds )
+end
+@windows_only begin
+	@dlogpdfx Normal dx += (d.mean - x) / (d.std * d.std) * ds
+	@dlogpdfd Normal ( 	dd1 += (x - d.mean) / (d.std*d.std) * ds;
+						dd2 += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
+end
 
 ## Uniform distribution
-@dfunc logpdf(d::Uniform, x::Real)           d  ( dd1 += (d.a <= x <= d.b) / (d.b - d.a) * ds ;
-										          dd2 += (d.a <= x <= d.b) / (d.a - d.b) * ds )
-@dfunc logpdf(d::Uniform, x::Array)          d  ( for i in 1:length(x)
-													dd1 += (d.a <= x[i] <= d.b) / (d.b - d.a) * ds[i]
-									              	dd2 += (d.a <= x[i] <= d.b) / (d.a - d.b) * ds[i]
-									              end )
-@dfunc logpdf(d::Array{Uniform}, x::Array)   d  ( for i in 1:length(x)
-													dd1[i] += (d[i].a <= x[i] <= d[i].b) / (d[i].b - d[i].a) * ds[i]
-									              	dd2[i] += (d[i].a <= x[i] <= d[i].b) / (d[i].a - d[i].b) * ds[i]
-									              end )
+@dlogpdfx Uniform dx += 0.
+@dlogpdfd Uniform ( dd1 += (d.a <= x <= d.b) / (d.b - d.a) * ds ;
+					dd2 += (d.a <= x <= d.b) / (d.a - d.b) * ds )
 
-@dfunc logpdf(d::Uniform, x::Real)           x   dx += 0.
-@dfunc logpdf(d::Uniform, x::Array)          x   dx += 0.
-@dfunc logpdf(d::Array{Uniform}, x::Array)   x   dx += 0.
+## Weibull distribution
+@dlogpdfd Weibull   ( dd1 += ((1. - (x/d.scale)^d.shape) * log(x/d.scale) + 1./d.shape) * ds ;
+						dd2 += ((x/d.scale)^d.shape - 1.) * d.shape/d.scale * ds )
+@dlogpdfx Weibull   dx += ((1. - (x/d.scale)^d.shape) * d.shape - 1.) / x * ds
 
-# ## Weibull distribution
-# @dfunc logpdfWeibull(sh::Real, sc, x)    sh  (r = x./sc ; sum(((1. - r.^sh) .* log(r) + 1./sh)) * ds)
-# @dfunc logpdfWeibull(sh::Array, sc, x)   sh  (r = x./sc ; ((1. - r.^sh) .* log(r) + 1./sh) * ds)
-# @dfunc logpdfWeibull(sh, sc::Real, x)    sc  sum(((x./sc).^sh - 1.) .* sh./sc) * ds
-# @dfunc logpdfWeibull(sh, sc::Array, x)   sc  ((x./sc).^sh - 1.) .* sh./sc * ds
-# @dfunc logpdfWeibull(sh, sc, x::Real)    x   sum(((1. - (x./sc).^sh) .* sh - 1.) ./ x) * ds
-# @dfunc logpdfWeibull(sh, sc, x::Array)   x   ((1. - (x./sc).^sh) .* sh - 1.) ./ x * ds
-@dfunc logpdf(d::Weibull, x::Real)          d  ( dd1 += ((1. - (x/d.scale)^d.shape) * log(x/d.scale) + 1./d.shape) * ds ;
-										         dd2 += ((x/d.scale)^d.shape - 1.) * d.shape/d.scale * ds )
-@dfunc logpdf(d::Weibull, x::Array)         d  ( for i in 1:length(x) 
-													dd1 += ((1. - (x[i]/d.scale)^d.shape) * log(x[i]/d.scale) + 1./d.shape) * ds[i] ;
-									            	dd2 += ((x[i]/d.scale)^d.shape - 1.) * d.shape/d.scale * ds[i]
-									             end )
-@dfunc logpdf(d::Array{Weibull}, x::Array)  d  ( for i in 1:length(x) 
-													dd1[i] += ((1. - (x[i]/d[i].scale)^d[i].shape) * log(x[i]/d[i].scale) + 
-														1./d[i].shape) * ds[i] 
-									            	dd2[i] += ((x[i]/d[i].scale)^d[i].shape - 1.) * d[i].shape/d[i].scale * ds[i]
-									             end )
+## Beta distribution
+@dlogpdfd Beta   ( dd1 += (digamma(d.alpha+d.beta) - digamma(d.alpha) + log(x)) * ds ;
+				    dd2 += (digamma(d.alpha+d.beta) - digamma(d.beta) + log(1-x)) * ds )
+@dlogpdfx Beta   dx += ((d.alpha-1) / x - (d.beta-1)/(1-x)) * ds
 
-@dfunc logpdf(d::Weibull, x::Real)          x   dx += ((1. - (x/d.scale)^d.shape) * d.shape - 1.) / x * ds
-@dfunc logpdf(d::Weibull, x::Array)         x   (for i in 1:length(ds) ; 
-													dx[i] += ((1. - (x[i]/d.scale)^d.shape) * d.shape - 1.) / x[i] * ds[i] 
-												end )
-@dfunc logpdf(d::Array{Weibull}, x::Array)  x   (for i in 1:length(ds) ; 
-													dx[i] += ((1.-(x[i]/d[i].scale)^d[i].shape) * d[i].shape - 1.) / x[i] * ds[i] 
-												end )
-
-# ## Beta distribution
-# @dfunc logpdfBeta(a, b, x::Real)      x     sum((a-1) ./ x - (b-1) ./ (1-x)) * ds
-# @dfunc logpdfBeta(a, b, x::Array)     x     ((a-1) ./ x - (b-1) ./ (1-x)) * ds
-# @dfunc logpdfBeta(a::Real, b, x)      a     sum(digamma(a+b) - digamma(a) + log(x)) * ds
-# @dfunc logpdfBeta(a::Array, b, x)     a     (digamma(a+b) - digamma(a) + log(x)) * ds
-# @dfunc logpdfBeta(a, b::Real, x)      b     sum(digamma(a+b) - digamma(b) + log(1-x)) * ds
-# @dfunc logpdfBeta(a, b::Array, x)     b     (digamma(a+b) - digamma(b) + log(1-x)) * ds
-@dfunc logpdf(d::Beta, x::Real)           d  ( dd1 += (digamma(d.alpha+d.beta) - digamma(d.alpha) + log(x)) * ds ;
-										       dd2 += (digamma(d.alpha+d.beta) - digamma(d.beta) + log(1-x)) * ds )
-@dfunc logpdf(d::Beta, x::Array)          d  ( for i in 1:length(x)
-													dd1 += (digamma(d.alpha+d.beta) - digamma(d.alpha) + log(x[i])) * ds[i]
-									              	dd2 += (digamma(d.alpha+d.beta) - digamma(d.beta) + log(1-x[i])) * ds[i]
-									           end )
-@dfunc logpdf(d::Array{Beta}, x::Array)   d  ( for i in 1:length(x)
-													dd1[i] += (digamma(d[i].alpha+d[i].beta) - digamma(d[i].alpha) + log(x[i])) * ds[i]
-									              	dd2[i] += (digamma(d[i].alpha+d[i].beta) - digamma(d[i].beta) + log(1-x[i])) * ds[i]
-									           end )
-
-@dfunc logpdf(d::Beta, x::Real)           x   dx += ((d.alpha-1) / x - (d.beta-1)/(1-x)) * ds
-@dfunc logpdf(d::Beta, x::Array)          x   for i in 1:length(x)
-												dx[i] += ((d.alpha-1) / x[i] - (d.beta-1)/(1-x[i])) * ds[i]
-									          end
-@dfunc logpdf(d::Array{Beta}, x::Array)   x   for i in 1:length(x)
-												dx[i] += ((d[i].alpha-1) / x[i] - (d[i].beta-1)/(1-x[i])) * ds[i]
-									          end
-
-# ## TDist distribution
+## TDist distribution
+@dlogpdfd TDist   dd1 += ((x*x-1)/(x*x + d.df)+log(d.df/(x*x+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds
+@dlogpdfx TDist   dx += (-(d.df+1)*x / (d.df+x*x)) * ds
 # @dfunc logpdfTDist(df, x::Real)     x     sum(-(df+1).*x ./ (df+x.*x)) .* ds
 # @dfunc logpdfTDist(df, x::Array)    x     (-(df+1).*x ./ (df+x.*x)) .* ds
 # @dfunc logpdfTDist(df::Real, x)     df    (tmp2 = (x.*x + df) ; sum( (x.*x-1)./tmp2 + log(df./tmp2) + digamma((df+1)/2) - digamma(df/2) ) / 2 .* ds )
 # @dfunc logpdfTDist(df::Array, x)    df    (tmp2 = (x.*x + df) ; ( (x.*x-1)./tmp2 + log(df./tmp2) + digamma((df+1)/2) - digamma(df/2) ) / 2 .* ds )
-@dfunc logpdf(d::TDist, x::Real)          d  dd1 += ((x*x-1)/(x*x + d.df)+log(d.df/(x*x+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds
-@dfunc logpdf(d::TDist, x::Array)         d  ( for i in 1:length(x) 
-												 dd1 += ((x[i]*x[i]-1)/(x[i]*x[i] + d.df)+log(d.df/(x[i]*x[i]+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds[i]
-									           end )
-@dfunc logpdf(d::Array{TDist}, x::Array)  d  ( for i in 1:length(x) 
-												 dd1[i] += ((x[i]*x[i]-1)/(x[i]*x[i] + d[i].df) +
-												 	log(d[i].df/(x[i]*x[i]+d[i].df)) +
-												 	digamma((d[i].df+1)/2) - digamma(d[i].df/2) ) / 2 * ds[i]
-									           end )
+# @dfunc logpdf(d::TDist, x::Real)          d  dd1 += ((x*x-1)/(x*x + d.df)+log(d.df/(x*x+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds
+# @dfunc logpdf(d::TDist, x::Array)         d  ( for i in 1:length(x) 
+# 												 dd1 += ((x[i]*x[i]-1)/(x[i]*x[i] + d.df)+log(d.df/(x[i]*x[i]+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds[i]
+# 									           end )
+# @dfunc logpdf(d::Array{TDist}, x::Array)  d  ( for i in 1:length(x) 
+# 												 dd1[i] += ((x[i]*x[i]-1)/(x[i]*x[i] + d[i].df) +
+# 												 	log(d[i].df/(x[i]*x[i]+d[i].df)) +
+# 												 	digamma((d[i].df+1)/2) - digamma(d[i].df/2) ) / 2 * ds[i]
+# 									           end )
 
-@dfunc logpdf(d::TDist, x::Real)          x   dx += (-(d.df+1)*x / (d.df+x*x)) * ds
-@dfunc logpdf(d::TDist, x::Array)         x   (for i in 1:length(ds) ; 
-													dx[i] += (-(d.df+1)*x[i] / (d.df+x[i]*x[i])) * ds[i]
-											   end )
-@dfunc logpdf(d::Array{TDist}, x::Array)  x   (for i in 1:length(ds) ; 
-													dx[i] += (-(d[i].df+1)*x[i] / (d[i].df+x[i]*x[i])) * ds[i]
-											   end )
+# @dfunc logpdf(d::TDist, x::Real)          x   dx += (-(d.df+1)*x / (d.df+x*x)) * ds
+# @dfunc logpdf(d::TDist, x::Array)         x   (for i in 1:length(ds) ; 
+# 													dx[i] += (-(d.df+1)*x[i] / (d.df+x[i]*x[i])) * ds[i]
+# 											   end )
+# @dfunc logpdf(d::Array{TDist}, x::Array)  x   (for i in 1:length(ds) ; 
+# 													dx[i] += (-(d[i].df+1)*x[i] / (d[i].df+x[i]*x[i])) * ds[i]
+# 											   end )
 
-# ## Exponential distribution
+## Exponential distribution
+@dlogpdfd Exponential   dd1 += (x-d.scale) / (d.scale*d.scale) * ds
+@dlogpdfx Exponential   dx -= ds / d.scale
 # @dfunc logpdfExponential(sc, x::Real)    x   sum(-1/sc) .* ds
 # @dfunc logpdfExponential(sc, x::Array)   x   (- ds ./ sc)
 # @dfunc logpdfExponential(sc::Real, x)    sc  sum((x-sc)./(sc.*sc)) .* ds
 # @dfunc logpdfExponential(sc::Array, x)   sc  (x-sc) ./ (sc.*sc) .* ds
 
-# ## Gamma distribution
-# # @dfunc logpdfGamma(sh, sc, x::Real)    x   sum(-( sc + x - sh.*sc)./(sc.*x)) .* ds
-# # @dfunc logpdfGamma(sh, sc, x::Array)   x   (-( sc + x - sh.*sc)./(sc.*x)) .* ds
-# # @dfunc logpdfGamma(sh::Real, sc, x)    sh  sum(log(x) - log(sc) - digamma(sh)) .* ds
-# # @dfunc logpdfGamma(sh::Array, sc, x)   sh  (log(x) - log(sc) - digamma(sh)) .* ds
-# # @dfunc logpdfGamma(sh, sc::Real, x)    sc  sum((x - sc.*sh) ./ (sc.*sc)) .* ds
-# # @dfunc logpdfGamma(sh, sc::Array, x)   sc  ((x - sc.*sh) ./ (sc.*sc)) .* ds
-@dfunc logpdf(d::Gamma, x::Real)          d  ( dd1 += (log(x) - log(d.scale) - digamma(d.shape)) * ds ;
-										       dd2 += ((x - d.scale*d.shape) / (d.scale*d.scale)) * ds )
-@dfunc logpdf(d::Gamma, x::Array)         d  ( for i in 1:length(x) 
-												 dd1 += (log(x[i]) - log(d.scale) - digamma(d.shape)) * ds[i] 
-										         dd2 += ((x[i] - d.scale*d.shape) / (d.scale*d.scale)) * ds[i]
-									           end )
-@dfunc logpdf(d::Array{Gamma}, x::Array)  d  ( for i in 1:length(x) 
-												 dd1[i] += (log(x[i]) - log(d[i].scale) - digamma(d[i].shape)) * ds[i] 
-										         dd2[i] += ((x[i] - d[i].scale*d[i].shape) / (d[i].scale*d[i].scale)) * ds[i]
-									           end )
+## Gamma distribution
+@dlogpdfd Gamma   ( dd1 += (log(x) - log(d.scale) - digamma(d.shape)) * ds ;
+					dd2 += ((x - d.scale*d.shape) / (d.scale*d.scale)) * ds )
+@dlogpdfx Gamma   dx += (-( d.scale + x - d.shape*d.scale)/(d.scale*x)) * ds
 
-@dfunc logpdf(d::Gamma, x::Real)          x   dx += (-( d.scale + x - d.shape*d.scale)/(d.scale*x)) * ds
-@dfunc logpdf(d::Gamma, x::Array)         x   (for i in 1:length(ds) ; 
-													dx[i] += (-( d.scale + x[i] - d.shape*d.scale)/(d.scale*x[i])) * ds[i]
-											   end )
-@dfunc logpdf(d::Array{Gamma}, x::Array)  x   (for i in 1:length(ds) ; 
-													dx[i] += (-( d[i].scale + x[i] - d[i].shape*d[i].scale)/(d[i].scale*x[i])) * ds[i]
-											   end )
+## Cauchy distribution
+@dlogpdfd Cauchy   ( dd1 += (2(x-d.location) / (d.scale*d.scale + (x-d.location)*(x-d.location))) * ds ;
+					 dd2 += (((x-d.location)*(x-d.location) - d.scale*d.scale) / (d.scale*(d.scale*d.scale + (x-d.location)*(x-d.location)))) * ds )
+@dlogpdfx Cauchy   dx += (2(d.location-x) / (d.scale*d.scale + (x-d.location)*(x-d.location))) * ds
 
-# ## Cauchy distribution
-# @dfunc logpdfCauchy(mu, sc, x::Real)    x   sum(2(mu-x) ./ (sc.*sc + (x-mu).*(x-mu))) .* ds
-# @dfunc logpdfCauchy(mu, sc, x::Array)   x   (2(mu-x) ./ (sc.*sc + (x-mu).*(x-mu))) .* ds
-# @dfunc logpdfCauchy(mu::Real, sc, x)    mu  sum(2(x-mu) ./ (sc.*sc + (x-mu).*(x-mu))) .* ds
-# @dfunc logpdfCauchy(mu::Array, sc, x)   mu  (2(x-mu) ./ (sc.*sc + (x-mu).*(x-mu))) .* ds
-# @dfunc logpdfCauchy(mu, sc::Real, x)    sc  sum(((x-mu).*(x-mu) - sc.*sc) ./ (sc.*(sc.*sc + (x-mu).*(x-mu)))) .* ds
-# @dfunc logpdfCauchy(mu, sc::Array, x)   sc  (((x-mu).*(x-mu) - sc.*sc) ./ (sc.*(sc.*sc + (x-mu).*(x-mu)))) .* ds
-
-# ## Log-normal distribution
-# @dfunc logpdfLogNormal(lmu, lsc, x::Real)   x    ( tmp2=lsc.*lsc ; sum( (lmu - tmp2 - log(x)) ./ (tmp2.*x) ) .* ds )
-# @dfunc logpdfLogNormal(lmu, lsc, x::Array)  x    ( tmp2=lsc.*lsc ; ( (lmu - tmp2 - log(x)) ./ (tmp2.*x) ) .* ds )
-# @dfunc logpdfLogNormal(lmu::Real, lsc, x)   lmu  sum((log(x) - lmu) ./ (lsc .* lsc)) .* ds
-# @dfunc logpdfLogNormal(lmu::Array, lsc, x)  lmu  ((log(x) - lmu) ./ (lsc .* lsc)) .* ds
-# @dfunc logpdfLogNormal(lmu, lsc::Real, x)   lsc  ( tmp2=lsc.*lsc ; sum( (lmu.*lmu - tmp2 - log(x).*(2lmu-log(x))) ./ (lsc.*tmp2) ) .* ds )
-# @dfunc logpdfLogNormal(lmu, lsc::Array, x)  lsc  ( tmp2=lsc.*lsc ; ( (lmu.*lmu - tmp2 - log(x).*(2lmu-log(x))) ./ (lsc.*tmp2) ) .* ds )
+## Log-normal distribution
+@dlogpdfd LogNormal   ( dd1 += (log(x) - d.meanlog) / (d.sdlog*d.sdlog) * ds ;
+					 	dd2 += (d.meanlog*d.meanlog - d.sdlog*d.sdlog - log(x)*(2d.meanlog-log(x))) / (d.sdlog*d.sdlog*d.sdlog) * ds )
+@dlogpdfx LogNormal   dx += (d.meanlog - d.sdlog*d.sdlog - log(x)) / (d.sdlog*d.sdlog*x) * ds 
 
 
 # # TODO : find a way to implement multi variate distribs that goes along well with vectorization (Dirichlet, Categorical)
@@ -349,15 +293,16 @@ end
 # # TODO : other discrete distribs ? : NegativeBinomial, DiscreteUniform, HyperGeometric, Geometric, Categorical
 
 ## Bernoulli distribution (Note : no derivation on x parameter as it is an integer)
-@dfunc logpdf(d::Bernoulli, x::Real)           d   dd1 += 1. / (d.p1 - 1. + x) * ds
-@dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd1 += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
-@dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd1[i] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
+@dlogpdfd Bernoulli     dd1 += 1. / (d.p1 - 1. + x) * ds
+# @dfunc logpdf(d::Bernoulli, x::Real)           d   dd1 += 1. / (d.p1 - 1. + x) * ds
+# @dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd1 += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
+# @dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd1[i] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
 
 ## Binomial distribution (Note : no derivation on x and n parameters as they are integers)
-# @dfunc logpdfBinomial(n, p::Real, x)   p    sum(x ./ p - (n-x) ./ (1 - p)) * ds
-# @dfunc logpdfBinomial(n, p::Array, x)  p    (x ./ p - (n-x) ./ (1 - p)) * ds
+@dlogpdfd Binomial      dd2 += (x / d.prob - (d.size-x) / (1 - d.prob)) * ds
 
-# ## Poisson distribution (Note : no derivation on x parameter as it is an integer)
+## Poisson distribution (Note : no derivation on x parameter as it is an integer)
+@dlogpdfd Poisson       dd1 += (x / d.lambda - 1) * ds
 # @dfunc logpdfPoisson(lambda::Real, x)   lambda   sum(x ./ lambda - 1) * ds
 # @dfunc logpdfPoisson(lambda::Array, x)  lambda   (x ./ lambda - 1) * ds
 
