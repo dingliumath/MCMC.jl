@@ -3,7 +3,7 @@ using DataFrames
 
 pwd()
 cd("MCMC.jl/src")
-include("MCMC.jl") 
+include("p:/documents/julia/MCMC.jl/src/MCMC.jl") 
 # using MCMC
 
 # simulate dataset
@@ -210,69 +210,73 @@ MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
     Bernoulli(ps::Array{Float64}) = map(Bernoulli, ps)
 
 #####  version générée  defs  ###
+Y = float64(Y)
+Abcd.generateModelFunction(ex, gradient=true, vars=zeros(nbeta), debug=true)
+_ll4, s, p, i = Abcd.generateModelFunction(ex, gradient=true, vars=zeros(nbeta))
+_ll4(zeros(nbeta))
+
     __beta = zeros(nbeta)
-	let 
-        global __ll3
+    let 
+        global ll_212
         local X = Main.X
         local Y = Main.Y
-        function __ll3(__beta::Vector{Float64})
+        function ll_212(_beta::Vector{Float64})
             try 
-                vars = __beta[1:10]
-                __acc = LLAcc(0.0)
-                d____acc_557 = 1.0
-                d__tmp_553 = zeros(Float64,(1000,))
-                d__tmp_555 = zeros(Float64,(1000,))
-                d__tmp_551 = zeros(Float64,(1000,))
-                d____acc_556 = 0.0
-                d__tmp_552 = zeros(Float64,(1000,))
-                dvars = zeros(Float64,(10,))
-                d__tmp_554 = zeros(Float64,(1000,2))
-                d__tmp_550 = zeros(Float64,(10,))
-                dprob = zeros(Float64,(1000,))
-                __tmp_549 = Normal(0,1.0)
-                __tmp_550 = logpdf(__tmp_549,vars)
-                ____acc_556 = +(__acc,__tmp_550)
-                __tmp_551 = *(X,vars)
-                __tmp_552 = exp(__tmp_551)
-                __tmp_553 = +(1.0,__tmp_552)
-                prob = /(1,__tmp_553)
-                __tmp_554 = Bernoulli(prob)
-                __tmp_555 = logpdf(__tmp_554,Y)
-                ____acc_557 = +(____acc_556,__tmp_555)
-                d____acc_556 += d____acc_557
-                for i = 1:length(d____acc_557) 
-                    d__tmp_555[i] += d____acc_557[i]
+                vars = _beta[1:10]
+                _acc = LLAcc(0.0)
+                _d_acc_226 = 1.0
+                _dtmp_320 = zeros(Float64,(1000,))
+                _dtmp_321 = zeros(Float64,(1000,))
+                _dtmp_324 = zeros(Float64,(1000,))
+                _dtmp_319 = zeros(Float64,(10,))
+                _d_acc_225 = 0.0
+                _dtmp_322 = zeros(Float64,(1000,))
+                _dvars = zeros(Float64,(10,))
+                _dprob = zeros(Float64,(1000,))
+                _dtmp_323_1 = zeros(Float64,(1000,))
+                _dtmp_323_2 = zeros(Float64,(1000,))
+                tmp_318 = Normal(0,1.0)
+                tmp_319 = logpdf(tmp_318,vars)
+                _acc_225 = +(_acc,tmp_319)
+                tmp_320 = *(X,vars)
+                tmp_321 = exp(tmp_320)
+                tmp_322 = +(1.0,tmp_321)
+                prob = /(1,tmp_322)
+                tmp_323 = Bernoulli(prob)
+                tmp_324 = logpdf(tmp_323,Y)
+                _acc_226 = +(_acc_225,tmp_324)
+                _d_acc_225 += _d_acc_226
+                for i = 1:length(tmp_324) 
+                    _dtmp_324[i] += _d_acc_226
                 end
-                __tmp_554[1].p1
-                i = 1
-                for i = 1:length(d__tmp_555)
-                    d__tmp_554[i,1] += *(/(1.0,+(-((__tmp_554[i]).p1,1.0),Y[i])),d__tmp_555[i])
+                for i = 1:length(_dtmp_324) 
+                    _dtmp_323_1[i] += *(/(1.0,+(-(tmp_323[i].p1,1.0),Y[i])),_dtmp_324[i])
                 end
-                for i = 1:size(d__tmp_554,1) 
-                    dprob[i] = d__tmp_554[i,1]
+                for i = 1:length(_dtmp_323_1) 
+                    _dprob[i] = _dtmp_323_1[i]
                 end
-                for i = 1:length(dprob)
-                    d__tmp_553[i] -= /(*(1,dprob[i]),*(__tmp_553[i],__tmp_553[i]))
+                for i = 1:length(_dprob) 
+                    _dtmp_322[i] -= /(*(1,_dprob[i]),*(tmp_322[i],tmp_322[i]))
                 end
-                for i = 1:length(d__tmp_553)
-                    d__tmp_552[i] += d__tmp_553[i]
+                for i = 1:length(_dtmp_322) 
+                    _dtmp_321[i] += _dtmp_322[i]
                 end
-                for i = 1:length(d__tmp_552)
-                    d__tmp_551[i] += *(exp(__tmp_551[i]),d__tmp_552[i])
+                for i = 1:length(_dtmp_321)
+                    _dtmp_320[i] += *(exp(tmp_320[i]),_dtmp_321[i])
                 end
-                gemm!('T','N',1.0,X,reshape(d__tmp_551, length(d__tmp_551),1),1.0,dvars)
-                for i = 1:length(d____acc_556) 
-                    d__tmp_550[i] += d____acc_556[i]
+                gemm!('T','N',1.0,X,reshape(_dtmp_320,length(_dtmp_320),1),1.0,_dvars)
+                for i = 1:length(tmp_319) 
+                    _dtmp_319[i] += _d_acc_225
                 end
-                for i = 1:length(d__tmp_550) 
-                    dvars[i] += *(/(-(__tmp_549.mean,vars[i]),*(__tmp_549.std,__tmp_549.std)),d__tmp_550[i])
+                for i = 1:length(_dtmp_319) 
+                    _dvars[i] += *(/(-(tmp_318.mean,vars[i]),*(tmp_318.std,tmp_318.std)),_dtmp_319[i])
                 end
-                local d__beta = similar(__beta)
-                d__beta[1:10] = dvars
-                (____acc_557.val,d__beta)
+                local _d_beta = similar(_beta)
+                _d_beta[1:10] = _dvars
+                (_acc_226.val,_d_beta)
             catch e 
                 if isa(e,OutOfSupportError) 
-                    return (-(Inf),zero(__beta))
+                    return (-(Inf),zero(_beta))
                 else 
                     throw(e)
                 end
@@ -282,22 +286,47 @@ MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
 
 ##########
 
-_ll1(zeros(nbeta))
-@time begin 
-		s = 0.
-		for i in 1:1000
-			t = randn(nbeta)
-			s += _ll1(t)[1]
-		end
-	end  # 0.75 sec
+module Mybench
+    include("p:/documents/julia/MCMC.jl.fredo/src/MCMC.jl")
+    include("p:/documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
+
+    srand(1)
+    nbeta = 10 # number of predictors, including intercept
+    beta0 = randn((nbeta,))
+
+    n = 1000
+    X = [ones(n) randn((n, nbeta-1))]
+    Y = rand(n) .< ( 1 ./ (1. + exp(X * beta0)))
+
+    # define model
+    ex = quote
+        vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
+        prob = 1 / (1. + exp(X * vars)) 
+        Y ~ Bernoulli(prob)
+    end
+
+    test0() = (s = 0. ; for i in 1:100 ; t = randn(nbeta) ; s += 1. ; s ; end)
+
+    _ll1, s, p, i = MCMC.generateModelFunction(ex, gradient=true, vars=zeros(nbeta))
+    _ll1(zeros(nbeta))
+    test1() = (s = 0. ; for i in 1:100 ; t = randn(nbeta) ; s += _ll1(t)[1] ; s ; end)
+
+    _ll4, s, p, i = Abcd.generateModelFunction(ex, gradient=true, vars=zeros(nbeta))
+    _ll4(zeros(nbeta))
+    test4() = (s = 0. ; for i in 1:100 ; t = randn(nbeta) ; s += _ll4(t)[1] ; s ; end)
+end
+
+@time Mybench.test0()  # < 0.0001 sec
+@time Mybench.test1()  # 0.105 - 0.160 sec
+@time Mybench.test4()  # 0.330 - 0.390 sec
 
 
-
+loop1() = (local YL = copy(Main.Y) ; s=0 ; for i in 1:1000; s += sum(Y); end; s)
+@time loop1()  # 0.0017
+loop2() = (local s=0. ; for i in 1:1000; for j in 1:length(Y) ; s += Y[j]; end ; end; s)
+@time loop2()  # 0.24 - 0.30
 
 using Base.LinAlg.BLAS
-using NumericExtensions
-
-gemm!
 
 _ll2(zeros(nbeta))
 function f2()
@@ -311,9 +340,7 @@ end
 @time f2() ;  # 0.22 sec
 
 
-Bernoulli
-
-__ll3(zeros(nbeta))
+_ll3(zeros(nbeta))
 function f3()
 	s = 0.
 	for i in 1:1000
@@ -322,7 +349,6 @@ function f3()
 	end
 	s
 end
-
 @time f3() ; # 4.5 sec !!!
 
 ##############  avec n = 100_000  #####################

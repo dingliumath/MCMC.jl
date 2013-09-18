@@ -46,9 +46,7 @@ module Abcd
 	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
 	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
 	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
-	# substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = get(smap, ex.args[1], ex.args[1]) ; toExpr(ex) )
 	substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = substSymbols(ex.args[1], smap) ; toExpr(ex) )
-	# substSymbols(ex::Symbol, smap::Dict) =        haskey(smap, ex) ? smap[ex] : ex
 	substSymbols(ex::Symbol, smap::Dict) =        get(smap, ex, ex)
 
 	
@@ -66,6 +64,16 @@ module Abcd
 	isSymbol(ex)   = isa(ex, Symbol)
 	isDot(ex)      = isa(ex, Expr) && ex.head == :.   && isa(ex.args[1], Symbol)
 	isRef(ex)      = isa(ex, Expr) && ex.head == :ref && isa(ex.args[1], Symbol)
+
+	# var name generator
+	let
+		vcount = Dict()
+		global newvar
+		function newvar(radix::Union(String, Symbol)="")
+			vcount[radix] = haskey(vcount, radix) ? vcount[radix]+1 : 1
+			return symbol("$radix#$(vcount[radix])")
+		end
+	end
 
 	immutable PDims
 		pos::Integer   # starting position of parameter in the parameter vector
@@ -117,13 +125,10 @@ module Abcd
 		explore(ex::Exprref) =    toExpr(ex) # no processing
 		explore(ex::Exprequal) =  toExpr(ex) # no processing
 		explore(ex::Exprvcat) =   toExpr(ex) # no processing
-
 		explore(ex::Exprdot) =    toExpr(ex) # no processing
-		
 		explore(ex::Exprpequal) = (args = ex.args ; Expr(:(=), args[1], Expr(:call, :+, args...)) )
 		explore(ex::Exprmequal) = (args = ex.args ; Expr(:(=), args[1], Expr(:call, :-, args...)) )
 		explore(ex::Exprtequal) = (args = ex.args ; Expr(:(=), args[1], Expr(:call, :*, args...)) )
-
 		explore(ex::Exprtrans) = explore(Expr(:call, :transpose, ex.args[1]))
 
 		function explore(ex::Exprblock)
@@ -151,13 +156,12 @@ module Abcd
 		# blockify if single expression
 		source.head == :block || ( source = Expr(:block, source) )
 
-		assert(length(source.args)>=1, "model should be a block with at least 1 statement")
+		assert(length(source.args)>=1, "model should have at least 1 statement")
 
 		m.source = explore(source)
 
 		# if no distribution expression '~' was found consider that last expr is the variable to be maximized 
 		if !distribFound
-			# m.source.args[end] = Expr(:(=) , ACC_SYM, m.source.args[end] )
 			lastex = m.source.args[end]
 			lastex.head == :(=) && (lastex = lastex.args[2]) # if assigment, take rhs only 
 			m.source.args[end] = :( $ACC_SYM = $ACC_SYM + $lastex ) 
@@ -216,7 +220,7 @@ module Abcd
 			for e2 in args  
 				if isa(e2, Expr) # only refs and calls will work
 					ue = explore(e2)
-					nv = gensym(TEMP_NAME)
+					nv = newvar(TEMP_NAME)
 					push!(m.exprs, :($nv = $ue))
 					push!(na, nv)
 				else
@@ -245,7 +249,7 @@ module Abcd
 	        # second, rename lhs symbol if set before
 	        lhs = collect(getSymbols(el[idx].args[1]))[1]  # there should be only one
 	        if contains(used, lhs) # if var already set once => create a new one
-	            subst[lhs] = gensym("$lhs") # generate new name, add it to substitution list for following statements
+	            subst[lhs] = newvar(lhs) # generate new name, add it to substitution list for following statements
 	            el[idx].args[1] = substSymbols(el[idx].args[1], subst)
 	        else # var set for the first time
 	            union!(used, Set(lhs)) 
@@ -421,7 +425,7 @@ module Abcd
 		vhooks = Expr(:block, [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]...) # assigment block
 
 		# build and evaluate the let block containing the function and external vars hooks
-		fn = gensym()
+		fn = newvar()
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = :(let; global $fn; $vhooks; $body; end)
 		
@@ -464,6 +468,7 @@ module Abcd
 			backwardSweep!(m)
 
 			body = Expr[] # list of = expr making the model
+			header = Expr[]  # let block statements
 
 			# initialization statements 
 			body = [ betaAssign(m)...,              # assigments beta vector -> model parameter vars
@@ -479,27 +484,35 @@ module Abcd
 				elseif 	isa(vh, LLAcc)
 					push!(body, :($dsym = 0.) )
 				elseif 	isa(vh, Array{Float64})
-					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
+					# push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
+					push!(header, :( local $dsym = Array(Float64, $(Expr(:tuple,size(vh)...)))) )
+					push!(body, :( fill!($dsym, 0.) ) )
 				elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :( $dsym = zeros(2)))
+					push!(body, :( $(symbol("$dsym#1")) = 0. ) )
+					push!(body, :( $(symbol("$dsym#2")) = 0. ) )
 				elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-					push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...,2))) ) )
+					# push!(body, :( $(symbol("$dsym#1")) = zeros(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+					# push!(body, :( $(symbol("$dsym#2")) = zeros(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+					push!(header, :( local $(symbol("$dsym#1")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+					push!(header, :( local $(symbol("$dsym#2")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+					push!(body, :( fill!($(symbol("$dsym#1")), 0.) ) )
+					push!(body, :( fill!($(symbol("$dsym#2")), 0.) ) )
 				else
 					error("[generateModelFunction] invalid gradient var type $v $(typeof(vh))")
 				end
 			end
 
+			body = [ body, m.exprs..., m.dexprs...]
 			# build function statements, and move to let block constant statements for optimization
-			header = Expr[]  # let block statements
-			fvars = union(Set([e.args[1] for e in body]...), Set(PARAM_SYM)) # vars that are re-evaluated at each function call
-			for ex in [m.exprs..., m.dexprs...]
+			# fvars = union(Set([e.args[1] for e in body]...), Set(PARAM_SYM)) # vars that are re-evaluated at each function call
+			# for ex in [m.exprs..., m.dexprs...]
 				# if length(intersect(getSymbols(ex.args[2]), fvars)) > 0
-					push!(body, ex)
-					fvars = union(fvars, getSymbols(ex.args[1]))
+					# push!(body, ex)
+					# fvars = union(fvars, getSymbols(ex.args[1]))
 				# else
 				# 	push!(header, ex)
 				# end
-			end
+			# end
 
 			# prefix statements with 'local' at first occurence
 			# vars  = Set(PARAM_SYM)
@@ -566,7 +579,7 @@ module Abcd
 		header = [[ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]..., header...] # assigment block
 
 		# build and evaluate the let block containing the function and external vars hooks
-		fn = gensym("ll")
+		fn = newvar(:ll)
 		body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
 		body = Expr(:let, Expr(:block, :(global $fn), header..., body))
 
@@ -595,7 +608,9 @@ module Abcd
 	end
 
 
-	include("mydiff.jl")
+	include("deriv_rules.jl")
+	include("vector_dists.jl")
+	include("derive.jl")
 end 
 
 

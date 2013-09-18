@@ -11,7 +11,6 @@ testedmod = Abcd
 
 
 
-
 @test testedmod.isSymbol(:a)            == true
 @test testedmod.isSymbol(:(a[1]))       == false
 @test testedmod.isSymbol(:(a.b))        == false
@@ -70,8 +69,8 @@ smap = {:a => :x, :b => :y}
 @test testedmod.substSymbols(:(a[z]), smap)            == :(x[z])
 @test testedmod.substSymbols(:(z[a]), smap)            == :(z[x])
 @test testedmod.substSymbols(:(a.z), smap)             == :(x.z)
-@test testedmod.substSymbols(:(z.a), smap)             == :(z.a)  # note : no subst on field names
+@test testedmod.substSymbols(:(z.a), smap)             == :(z.a)     # note : no subst on field names
 @test testedmod.substSymbols(:(z.a[x]), smap)          == :(z.a[x])  # note : no subst on field names
 @test testedmod.substSymbols(:(z[x].a), smap)          == :(z[x].a)  # note : no subst on field names
-@test testedmod.substSymbols(:(a[x].z), smap)          == :(x[x].z)  # note : no subst on field names
+@test testedmod.substSymbols(:(a[x].z), smap)          == :(x[x].z)  
 
