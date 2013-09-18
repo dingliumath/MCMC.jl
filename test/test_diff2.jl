@@ -6,14 +6,16 @@ using Base.Test
 # using MCMC 
 
 @windows_only begin
-		include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
-	end
+	include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
+	testedmodule = Abcd
+	include("p:/Documents/julia/MCMC.jl.fredo/test/helper_diff.jl")
+end
 @unix_only begin
-		include("~/devl/MCMC.jl.fredo/src/autodiff/mymod.jl")
-	end
+	include("/home/fredo/devl/MCMC.jl.fredo/src/autodiff/mymod.jl")
+	testedmodule = Abcd
+	include("/home/fredo/devl/MCMC.jl.fredo/test/helper_diff.jl")
+end
 
-testedmodule = Abcd
-include("p:/Documents/julia/MCMC.jl.fredo/test/helper_diff.jl")
 
 ## variables of different dimension for testing
 v0ref = 2.
@@ -40,8 +42,10 @@ v2ref = [-1. 3 0 ; 0 5 -2]
 @test_combin    transpose(x) 
 @test_combin    x' 
 
-# @test_combin    max(x,y)  x->x+0.001  # x slightly shifted to avoid numerical derivation fail 
-# @test_combin    min(x,y)
+@test_combin    max(x,y)  x->x+0.001  size(x)==size(y) || ndims(x)==0 || ndims(y)==0 
+# (x slightly shifted to avoid numerical derivation fail )
+
+@test_combin    min(x,y)  size(x)==size(y) || ndims(x)==0 || ndims(y)==0
 
 @test_combin    x^y       ndims(x)==ndims(y)==0
 
@@ -70,24 +74,35 @@ deriv1(:(v2ref[:,1:2]*x), [-3. 2 0 ; 1 1 -2])
 												(ndims(sc)==0 || size(sc)==size(x))
 
 # @mtest testpattern1 logpdfBeta(a,b,x)         x->clamp(x, 0.01, 0.99) a->a<=0?0.1:a b->b<=0?0.1:b
-@test_combin    logpdf(Beta(a,b),x)         x->clamp(x, 0.01, 0.99) a->a<=0?0.1:a b->b<=0?0.1:b (size(a)==size(b)) && (ndims(a)==0 || size(x)==size(a))
+@test_combin    logpdf(Beta(a,b),x)         x->clamp(x, 0.01, 0.99) a->a<=0?0.1:a b->b<=0?0.1:b (size(a)==size(b)) && 
+												(ndims(a)==0 || size(x)==size(a))
 
 # @mtest testpattern1 logpdfTDist(df,x)         df->df<=0?0.1:df
-@test_combin    logpdf(TDist(df),x)         df->df<=0?0.1:df    (size(df)==size(x)) || ndims(df)==0
+@test_combin    logpdf(TDist(df),x)         df->df<=0?0.1:df    (size(df)==size(x)) || ndims(df)==0  # fail
 
-@mtest testpattern1 logpdfExponential(sc,x)   sc->sc<=0?0.1:sc  x->x<=0?0.1:x
-@mtest testpattern1 logpdfCauchy(mu,sc,x)      sc->sc<=0?0.1:sc
-@mtest testpattern1 logpdfLogNormal(lmu,lsc,x)  lsc->lsc<=0?0.1:lsc x->x<=0?0.1:x
+# @mtest testpattern1 logpdfExponential(sc,x)   sc->sc<=0?0.1:sc  x->x<=0?0.1:x
+@test_combin    logpdf(Exponential(sc),x)   sc->sc<=0?0.1:sc  x->x<=0?0.1:x   (size(sc)==size(x)) || ndims(sc)==0  # fail
+
+# @mtest testpattern1 logpdfCauchy(mu,sc,x)      sc->sc<=0?0.1:sc
+@test_combin    logpdf(Cauchy(mu,sc),x)   sc->sc<=0?0.1:sc  (size(mu)==size(sc)) && 
+								(ndims(mu)==0 || size(x)==size(mu)) 
+
+# @mtest testpattern1 logpdfLogNormal(lmu,lsc,x)  lsc->lsc<=0?0.1:lsc x->x<=0?0.1:x
+@test_combin    logpdf(LogNormal(lmu,lsc),x)   lsc->lsc<=0?0.1:lsc x->x<=0?0.1:x (size(lmu)==size(lsc)) && 
+								(ndims(lmu)==0 || size(x)==size(lmu))
 
 ## discrete distributions
 #  the variable x being an integer should not be derived against
 
 # note for Bernoulli : having prob=1 or 0 is ok but will make the numeric differentiator fail => not tested
-@test_combin logpdf(Bernoulli(prob),x) prob prob->clamp(prob, 0.01, 0.99) x->float64(x>0) size(prob)==size(x)||ndims(prob)==0
+@test_combin logpdf(Bernoulli(prob),x) prob prob->clamp(prob, 0.01, 0.99) x->float64(x>0) size(prob)==size(x)||ndims(prob)==0  #fail
 
+# @mtest testpattern1 logpdfPoisson(l,x)   exceptLast l->l<=0?0.1:l x->iround(abs(x)) 
+@test_combin logpdf(Poisson(l),x) l l->l<=0?0.1:l x->iround(abs(x)) size(l)==size(x)||ndims(l)==0  #fail
 
-@mtest testpattern1 logpdfPoisson(l,x)   exceptLast l->l<=0?0.1:l x->iround(abs(x)) 
-@mtest testpattern1 logpdfBinomial(n, prob,x)   exceptFirstAndLast prob->clamp(prob, 0.01, 0.99) x->iround(abs(x)) n->iround(abs(n)+10)
+# @mtest testpattern1 logpdfBinomial(n, prob,x)   exceptFirstAndLast prob->clamp(prob, 0.01, 0.99) x->iround(abs(x)) n->iround(abs(n)+10)
+@test_combin logpdf(Binomial(n,prob),x) prob prob->clamp(prob, 0.01, 0.99) x->iround(abs(x)) n->iround(abs(n)+10) (size(n)==size(prob)) && 
+								(ndims(n)==0 || size(x)==size(n)) 
 
 
 #########################################################################

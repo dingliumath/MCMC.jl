@@ -46,7 +46,7 @@ module Abcd
 	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
 	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
 	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
-	substSymbols(ex::Exprdot, smap::Dict) =       (ex.args[1] = substSymbols(ex.args[1], smap) ; toExpr(ex) )
+	substSymbols(ex::Exprdot, smap::Dict) =       (ex = toExpr(ex) ; ex.args[1] = substSymbols(ex.args[1], smap) ; ex)
 	substSymbols(ex::Symbol, smap::Dict) =        get(smap, ex, ex)
 
 	
