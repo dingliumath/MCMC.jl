@@ -608,7 +608,9 @@ module Abcd
 	end
 
 
-	include("mydiff.jl")
+	include("deriv_rules.jl")
+	include("vector_dists.jl")
+	include("derive.jl")
 end 
 
 

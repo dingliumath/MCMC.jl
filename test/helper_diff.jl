@@ -14,7 +14,7 @@ function deriv1(ex::Expr, x0::Union(Float64, Vector{Float64}, Matrix{Float64}))
 	println("testing gradient of $ex at x = $x0")
 
 	nx = length(x0)  
-	myf, dummy = Abcd.generateModelFunction(ex, gradient=true, x=x0)
+	myf, dummy = testedmodule.generateModelFunction(ex, gradient=true, x=x0)
 
 	pars0 = vec([x0])
 	l0, grad0 = myf(pars0)  
@@ -27,91 +27,65 @@ function deriv1(ex::Expr, x0::Union(Float64, Vector{Float64}, Matrix{Float64}))
 	if ! all(good_enough, zip([grad0], [gradn]))
 		println("Gradient false for $ex at x=$x0, expected $(round(gradn,5)), got $(round(grad0,5))")
 		println()
-		println(Abcd.generateModelFunction(ex, gradient=true, x=x0, debug=true) )
+		println(testedmodule.generateModelFunction(ex, gradient=true, x=x0, debug=true) )
 		error()
 	end
 end
 
+##  tests derivation on all parameters, for all combinations of arguments dimension
+macro test_combin(func::Expr, constraints...)
+	constraints = collect(constraints) 
+	parnames = collect(testedmodule.getSymbols(func))
+	# println("parnames : $parnames")
+	# dump(constraints)
+	#  args to derive against
+	dargs = filter(ex->isa(ex,Symbol), constraints)
+	length(dargs)==0 && (dargs = parnames)
+	assert(all(map(x->contains(parnames,x), dargs)), "some of specified derivation args $(dargs) not found in tested expression $func")
+	# println("dargs : $dargs")
 
-## argument pattern generation for testing
-# all args can be scalar, vector or matrices, 
-#   but without vector and matrices at the same time
-function testpattern1(nb)
-	ps = [ ifloor((i-1) / 2^(j-1)) % 2 for i=1:2^nb, j=1:nb]
-	vcat(ps, 2*ps[2:end,:])
-end
+	#  transformations on args to have valid calls
+	trans = filter(ex->isa(ex, Expr) && ex.head == :(->), constraints) 
+	# println("trans : $trans")
 
-testpattern2(nb) = fill(0, 1, nb) # all args are scalar
-testpattern3(nb) = fill(1, 1, nb) # all args are vectors
-testpattern4(nb) = fill(2, 1, nb) # all args are matrices
+	#  dimension validity rules
+	rules = filter(ex->isa(ex, Expr) && ex.head != :(->), constraints) 
+	# println("rules : $rules")
 
-# all args can be scalar, vector or matrices, but with no more than one array
-function testpattern5(nb)
-	ps = testpattern1(nb)
-	ps[(ps.>0) * ones(nb) .<= 1, :]
-end
-
-# for logpdfs : all args can be scalar, vector or matrices, 
-#   but without mixing vector and matrices
-#   AND same type for distribution params
-function testpattern6(nb)
-	ps = testpattern1(nb)
-	ok = mapslices(v->all(v[1] .== v[2:end-1]), ps, 2)
-	ps[vec(ok), :]
-end
-
-## runs arg dimensions combinations
-function runpattern(fex, parnames, rules, combin)
 	arity = length(parnames)
-
+	par = [ symbol("arg$i") for i in 1:arity]
+	
+	# try each arg dim combination
+	combin = [ [:v0ref, :v1ref, :v2ref][1+ ifloor((i-1) / 3^(j-1)) % 3] for i in 1:3^arity, j in 1:arity]
 	for ic in 1:size(combin,1)  # try each arg dim in combin
-		c = combin[ic,:]
-		par = [ symbol("arg$i") for i in 1:arity]
-
 		# create variables
-		for i in 1:arity  # generate arg1, arg2, .. variables
-			vn = par[i]  
-			vref = [:v0ref, :v1ref, :v2ref][c[i]+1]
-			eval(:( $vn = copy($vref)))
+		for i in 1:arity  
+			eval(:( $(par[i]) = copy($(combin[ic,i]))) )
 		end
 
-		# apply transformations on args
-		for r in rules # r = rules[1]
-			if isa(r, Expr) && r.head == :(->)
-				pos = find(parnames .== r.args[1]) # find the arg the rules applies to 
-				assert(length(pos)>0, "arg of rule ($r.args[1]) not found among $parnames")
+		# reject combination if one of rules fails
+		if all( [ eval( testedmodule.substSymbols(r, Dict(parnames, par))) for r in rules] )
+			# println("## combin = $(combin[ic,:])")
+			# apply transformations on args
+			for t in trans
+				pos = find(parnames .== t.args[1]) # find the arg the rules applies to 
+				assert(length(pos)>0, "arg of transfo ($t.args[1]) not found among $parnames")
 				vn = symbol("arg$(pos[1])")
-				eval(:( $vn = map($r, $vn)))
+				eval(:( $vn = map($t, $vn)))
+			end
+
+			# try derivation for each allowed argument
+			for p in dargs 
+				tpar = copy(par)
+				tpar[p .== parnames] = :x  # replace tested args with parameter symbol :x for deriv1 testing func
+				fex = testedmodule.substSymbols(func, Dict( parnames, tpar))
+				# println("##+## $fex  $(Dict( parnames, tpar))")
+				x0 = eval(par[p .== parnames][1])  # set x0 for deriv 1
+				# println("##-## $fex  ##-##")
+				deriv1(fex, x0) 
 			end
 		end
-
-		# now run tests
-		prange = [1:arity]
-		prange = any(rules .== :(:exceptLast)) ? prange[1:end-1] : prange
-		prange = any(rules .== :(:exceptFirstAndLast)) ? prange[2:end-1] : prange
-		# println("$prange - $(length(rules)) - $rules")
-		for p in prange  # try each argument as parameter
-			tpar = copy(par)
-			tpar[p] = :x  # replace tested args with parameter symbol :x for deriv1 testing func
-			# f = Expr(:call, [fsym, tpar...]...) 
-			f = Abcd.substSymbols(fex, Dict( parnames, tpar))
-			vn = symbol("arg$p")
-			x0 = eval(vn)  # set x0 for deriv 1
-			deriv1(f, x0+0.001)  # shift sightly (to avoid numerical derivation pb on max() and min())
-		end
 	end
+
 end
 
-## macro to simplify tests expression
-macro mtest(pattern, func::Expr, constraints...)
-	tmp = [ isa(e, Symbol) ? Expr(:quote, e) : e for e in constraints]
-	psym = collect( Abcd.getSymbols(func))
-	quote
-		local fex = $(Expr(:quote, func))
-		local pars = $(Expr(:quote, [psym...]) ) 
-		local rules = $(Expr(:quote, [tmp...]) ) 
-
-		combin = ($pattern)(length(pars))
-		runpattern(fex, pars, rules, combin)
-	end
-end
