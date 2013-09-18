@@ -11,7 +11,6 @@ testedmod = Abcd
 
 
 
-
 @test testedmod.isSymbol(:a)            == true
 @test testedmod.isSymbol(:(a[1]))       == false
 @test testedmod.isSymbol(:(a.b))        == false
