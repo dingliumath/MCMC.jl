@@ -1,7 +1,7 @@
 ######### logistic regression on binary response  ###########
 
 # simulate dataset
-const srand(1)
+srand(1)
 const n = 1000
 const nbeta = 10 # number of predictors, including intercept
 const X = [ones(n) randn((n, nbeta-1))]
