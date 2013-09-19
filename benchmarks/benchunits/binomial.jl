@@ -1,12 +1,12 @@
 ######### logistic regression on binary response  ###########
 
 # simulate dataset
-srand(1)
-n = 1000
-nbeta = 10 # number of predictors, including intercept
-X = [ones(n) randn((n, nbeta-1))]
-beta0 = randn((nbeta,))
-Y = rand(n) .< ( 1 ./ (1. + exp(- X * beta0)))
+const srand(1)
+const n = 1000
+const nbeta = 10 # number of predictors, including intercept
+const X = [ones(n) randn((n, nbeta-1))]
+const beta0 = randn((nbeta,))
+const Y = rand(n) .< ( 1 ./ (1. + exp(X * beta0)))
 
 # define model
 ex = quote
