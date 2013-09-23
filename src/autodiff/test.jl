@@ -6,13 +6,16 @@
 end
 @unix_only begin
     cd("~/devl/MCMC.jl/src/autodiff")
-    include("/home/fredo/devl/MCMC.jl/src/autodiff/mymod.jl")
+    include("/home/fredo/devl/MCMC.jl.fredo/src/autodiff/mymod.jl")
 end
+
+include("/home/fredo/devl/MCMC.jl.fredo/src/MCMC.jl")
+
 
 ######
 
 	b = 12
-	Abcd.debug(:( a*b ), a=0)
+	MCMC.Autodiff.debug(:( a*b ), a=0)
 	b = [1, 2, 3]
 	Abcd.debug(:( a*b ), a=0)
 	f, n, p, w = Abcd.generateModelFunction(:( a*b ), gradient=true, a=0)
@@ -30,9 +33,13 @@ end
 	Abcd.debug(:( b*a ), a=[0., 1, 2])
 	Abcd.generateModelFunction(:( b*a ), gradient=true, a=[0., 1, 2], debug=true)
 
-	f, a,b,c = Abcd.generateModelFunction(:( x+y ), gradient=true, x=0)
-	f, a,b,c = Abcd.generateModelFunction(:( a=x ), gradient=true, x=0)
-	f([-13.])
+
+    include("/home/fredo/devl/MCMC.jl.fredo/src/autodiff/mymod.jl")
+    a0=[1.,2] ; ex=:(x~Exponential(a)) ; x = [1.,2]
+    Abcd.debug(ex, a=a0)
+	f, a,b,c = Abcd.generateModelFunction(ex, a=a0)
+    f, a,b,c = Abcd.generateModelFunction(ex, a=a0, gradient=true)
+	f([13., 3.])
 
 y = 0.5
 x = 1.0

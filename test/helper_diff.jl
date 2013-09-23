@@ -2,6 +2,10 @@
 #    Helper functions for derivation tests
 #########################################################################
 
+
+testedmodule = MCMC.Autodiff
+
+
 ## error thresholds
 DIFF_DELTA = 1e-9
 ERROR_THRESHOLD = 2e-2
