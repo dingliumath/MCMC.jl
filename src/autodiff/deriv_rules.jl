@@ -202,7 +202,7 @@ end
 #  All Distribution types constructors
 for d in [:Bernoulli, :TDist, :Exponential, :Poisson]  
 	dfunc(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
-	dfunc(:( ($d)(p::Array) ), :p, :( copy!(dp1, ds1) ))
+	dfunc(:( ($d)(p::Array) ), :p, :( copy!(dp, ds1) ))
 end
 
 for d in [:Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
