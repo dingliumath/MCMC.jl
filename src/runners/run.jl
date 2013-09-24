@@ -46,7 +46,7 @@ function run( t::MCMCTask;
   j = 1
   for i in 1:len
     newprop = consume(t.task)
-    if in(i, r)
+    if contains(r,i)
       samples[:, j] = newprop.ppars
       if newprop.pgrads != nothing
         gradients[:, j] = newprop.pgrads
@@ -55,7 +55,7 @@ function run( t::MCMCTask;
       # save diagnostics
       for (k,v) in newprop.diagnostics
         # if diag name not seen before, create column
-        if !in(k, colnames(diags))
+        if !contains(colnames(diags),k)
           diags[string(k)] = DataArray(Array(typeof(v), nrow(diags)), falses(nrow(diags)) )
         end
         
