@@ -24,6 +24,16 @@ end
 
 MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
 
+
+ex2 = quote
+    vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
+    prob = 1 / (1. + exp(X * vars)) 
+    Y ~ Bernoulli(prob)
+end
+
+MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
+
+
 #####  version ref #####
 	let 
         global _ll1
