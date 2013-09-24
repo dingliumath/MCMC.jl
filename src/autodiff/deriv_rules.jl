@@ -202,7 +202,7 @@ end
 #  All Distribution types constructors
 for d in [:Bernoulli, :TDist, :Exponential, :Poisson]  
 	dfunc(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
-	dfunc(:( ($d)(p::Array) ), :p, :( dp = for i in 1:length(ds1) ; dp[i] = ds1[i] ; end ))
+	dfunc(:( ($d)(p::Array) ), :p, :( copy!(dp1, ds1) ))
 end
 
 for d in [:Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
@@ -242,35 +242,10 @@ end
 ## TDist distribution
 @dlogpdfd TDist   dd1 += ((x*x-1)/(x*x + d.df)+log(d.df/(x*x+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds
 @dlogpdfx TDist   dx += (-(d.df+1)*x / (d.df+x*x)) * ds
-# @dfunc logpdfTDist(df, x::Real)     x     sum(-(df+1).*x ./ (df+x.*x)) .* ds
-# @dfunc logpdfTDist(df, x::Array)    x     (-(df+1).*x ./ (df+x.*x)) .* ds
-# @dfunc logpdfTDist(df::Real, x)     df    (tmp2 = (x.*x + df) ; sum( (x.*x-1)./tmp2 + log(df./tmp2) + digamma((df+1)/2) - digamma(df/2) ) / 2 .* ds )
-# @dfunc logpdfTDist(df::Array, x)    df    (tmp2 = (x.*x + df) ; ( (x.*x-1)./tmp2 + log(df./tmp2) + digamma((df+1)/2) - digamma(df/2) ) / 2 .* ds )
-# @dfunc logpdf(d::TDist, x::Real)          d  dd1 += ((x*x-1)/(x*x + d.df)+log(d.df/(x*x+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds
-# @dfunc logpdf(d::TDist, x::Array)         d  ( for i in 1:length(x) 
-# 												 dd1 += ((x[i]*x[i]-1)/(x[i]*x[i] + d.df)+log(d.df/(x[i]*x[i]+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds[i]
-# 									           end )
-# @dfunc logpdf(d::Array{TDist}, x::Array)  d  ( for i in 1:length(x) 
-# 												 dd1[i] += ((x[i]*x[i]-1)/(x[i]*x[i] + d[i].df) +
-# 												 	log(d[i].df/(x[i]*x[i]+d[i].df)) +
-# 												 	digamma((d[i].df+1)/2) - digamma(d[i].df/2) ) / 2 * ds[i]
-# 									           end )
-
-# @dfunc logpdf(d::TDist, x::Real)          x   dx += (-(d.df+1)*x / (d.df+x*x)) * ds
-# @dfunc logpdf(d::TDist, x::Array)         x   (for i in 1:length(ds) ; 
-# 													dx[i] += (-(d.df+1)*x[i] / (d.df+x[i]*x[i])) * ds[i]
-# 											   end )
-# @dfunc logpdf(d::Array{TDist}, x::Array)  x   (for i in 1:length(ds) ; 
-# 													dx[i] += (-(d[i].df+1)*x[i] / (d[i].df+x[i]*x[i])) * ds[i]
-# 											   end )
 
 ## Exponential distribution
 @dlogpdfd Exponential   dd1 += (x-d.scale) / (d.scale*d.scale) * ds
 @dlogpdfx Exponential   dx -= ds / d.scale
-# @dfunc logpdfExponential(sc, x::Real)    x   sum(-1/sc) .* ds
-# @dfunc logpdfExponential(sc, x::Array)   x   (- ds ./ sc)
-# @dfunc logpdfExponential(sc::Real, x)    sc  sum((x-sc)./(sc.*sc)) .* ds
-# @dfunc logpdfExponential(sc::Array, x)   sc  (x-sc) ./ (sc.*sc) .* ds
 
 ## Gamma distribution
 @dlogpdfd Gamma   ( dd1 += (log(x) - log(d.scale) - digamma(d.shape)) * ds ;
@@ -294,16 +269,11 @@ end
 
 ## Bernoulli distribution (Note : no derivation on x parameter as it is an integer)
 @dlogpdfd Bernoulli     dd1 += 1. / (d.p1 - 1. + x) * ds
-# @dfunc logpdf(d::Bernoulli, x::Real)           d   dd1 += 1. / (d.p1 - 1. + x) * ds
-# @dfunc logpdf(d::Bernoulli, x::Array)          d   for i in 1:length(ds) ; dd1 += 1. / (d.p1 - 1. + x[i]) * ds[i] ; end
-# @dfunc logpdf(d::Array{Bernoulli}, x::Array)   d   for i in 1:length(ds) ; dd1[i] += 1. / (d[i].p1 - 1. + x[i]) * ds[i] ; end
 
 ## Binomial distribution (Note : no derivation on x and n parameters as they are integers)
 @dlogpdfd Binomial      dd2 += (x / d.prob - (d.size-x) / (1 - d.prob)) * ds
 
 ## Poisson distribution (Note : no derivation on x parameter as it is an integer)
 @dlogpdfd Poisson       dd1 += (x / d.lambda - 1) * ds
-# @dfunc logpdfPoisson(lambda::Real, x)   lambda   sum(x ./ lambda - 1) * ds
-# @dfunc logpdfPoisson(lambda::Array, x)  lambda   (x ./ lambda - 1) * ds
 
 

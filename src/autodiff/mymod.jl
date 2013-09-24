@@ -484,15 +484,12 @@ module Abcd
 				elseif 	isa(vh, LLAcc)
 					push!(body, :($dsym = 0.) )
 				elseif 	isa(vh, Array{Float64})
-					# push!(body, :( $dsym = zeros(Float64, $(Expr(:tuple,size(vh)...)))) )
 					push!(header, :( local $dsym = Array(Float64, $(Expr(:tuple,size(vh)...)))) )
 					push!(body, :( fill!($dsym, 0.) ) )
 				elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
 					push!(body, :( $(symbol("$dsym#1")) = 0. ) )
 					push!(body, :( $(symbol("$dsym#2")) = 0. ) )
 				elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-					# push!(body, :( $(symbol("$dsym#1")) = zeros(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
-					# push!(body, :( $(symbol("$dsym#2")) = zeros(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
 					push!(header, :( local $(symbol("$dsym#1")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
 					push!(header, :( local $(symbol("$dsym#2")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
 					push!(body, :( fill!($(symbol("$dsym#1")), 0.) ) )
