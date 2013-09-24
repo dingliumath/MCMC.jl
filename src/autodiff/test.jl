@@ -36,7 +36,7 @@ end
 
 y = 0.5
 x = 1.0
-ex = :( x ~ Bernoulli(y) )
+ex = :( x ~ TDist(y) )
 Abcd.debug(ex, y = 0.5)
 Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
 f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
