@@ -1,0 +1,46 @@
+### profile trace
+
+      2378 ...src/samplers/RWM.jl; SamplerTask; line: 122
+        4    no file; ll#1; line: 0
+         1 ...ns/src/fallbacks.jl; logpdf!; line: 135
+         2 array.jl; getindex; line: 292
+        1329 no file; ll#1; line: 13
+         1    array.jl; -; line: 861
+          1   abstractarray.jl; /; line: 294
+          46  array.jl; -; line: 857
+          33  array.jl; -; line: 858
+          98  array.jl; -; line: 859
+          674 linalg/matmul.jl; *; line: 68
+          81  linalg/matmul.jl; *; line: 69
+           81 linalg/matmul.jl; gemv; line: 234
+            81 linalg/blas.jl; gemv!; line: 384
+          294 operators.jl; exp; line: 228
+           85 abstractarray.jl; /; line: 294
+            83 array.jl; ./; line: 135
+            2  array.jl; ./; line: 928
+           6  array.jl; +; line: 135
+           1  array.jl; +; line: 928
+           4  array.jl; +; line: 929
+        1041 no file; ll#1; line: 14
+          6   ...s/src/fallbacks.jl; logpdf; line: 61
+          3   ...riate/bernoulli.jl; Bernoulli; line: 15
+          4   ...ff/vector_dists.jl; Bernoulli; line: 11
+          5   ...ff/vector_dists.jl; Bernoulli; line: 12
+          16  ...ff/vector_dists.jl; Bernoulli; line: 13
+          30  ...ff/vector_dists.jl; logpdf; line: 45
+          602 ...ff/vector_dists.jl; logpdf; line: 46
+          3   ...ff/vector_dists.jl; logpdf; line: 47
+          328 ...ff/vector_dists.jl; logpdf; line: 48
+           309 ...s/src/fallbacks.jl; logpdf; line: 61
+           4   ...riate/bernoulli.jl; pdf; line: 56
+          1   error.jl; assert; line: 43
+           3  ...todiff/autodiff.jl; +; line: 117
+            2 ...ions/src/reduce.jl; reduce; line: 135
+            1 ...ions/src/reduce.jl; sum; line: 370
+
+
+# ideas
+
+- generalize pre-allocations, even for first pass
+- use logpdf! when distributions defines it
+- spray line numbers everywhere
