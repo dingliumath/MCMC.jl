@@ -11,7 +11,7 @@
 
 using DataFrames
 using Benchmark
-include("p:/documents/julia/MCMC.jl.fredo/src/MCMC.jl") # temporary, for testing
+# include("p:/documents/julia/MCMC.jl.fredo/src/MCMC.jl") # temporary, for testing
 using MCMC
 
 # cd to MCMC package dir to get correct git commit id
