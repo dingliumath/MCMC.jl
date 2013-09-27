@@ -1,3 +1,12 @@
+############################################################################
+#  First attempt at decoupling automatic derivation from MCMC specific
+#    code.
+#
+#  a unique entry point : diff(ex, out::Symbol, in as keyword-args)
+#  returns an expression + var allocation expressions + var categorisation
+#
+############################################################################
+
 module Autodiff
 
 	using Distributions
@@ -90,14 +99,18 @@ module Autodiff
 		pars::PMap                # parameters with their mapping to the beta real vector
 		init::Vector{Float64}     # initial values of beta
 		source::Expr              # model source, after first pass
+		# pars::PMap              # parameters with their mapping to the beta real vector
+		init::Vector 			  # initial values of input variables
+		source::Expr              # model source
 		exprs::Vector{Expr}       # vector of assigments that make the model
 		dexprs::Vector{Expr}      # vector of assigments that make the gradient
-		finalacc::Symbol          # last symbol of loglik accumulator after renaming
+		insyms::Vector{Symbol}    # input vars symbols
+		outsym::Symbol            # output variable name (possibly renamed from initial out argument)
 		varsset::Set{Symbol}      # all the vars set in the model
 		pardesc::Set{Symbol}      # all the vars set in the model that depend on model parameters
 		accanc::Set{Symbol}       # all the vars (possibly external) that influence the accumulator
 	end
-	ParsingStruct() = ParsingStruct(0, Dict{Symbol, PDims}(), Float64[], :(), Expr[], Expr[], ACC_SYM, 
+	ParsingStruct() = ParsingStruct(0, Float64[], :(), Expr[], Expr[], Symbol[], symbol("###"),
 		Set{Symbol}(), Set{Symbol}(), Set{Symbol}())
 
 	#### Log-likelihood accumulator type  ####
@@ -116,14 +129,12 @@ module Autodiff
 	+(ll::LLAcc, x::Real) = LLAcc(ll.val + x)
 	+(ll::LLAcc, x::Array{Float64}) = LLAcc(ll.val + sum(x))
 
-
 	##### now include parsing and derivation scripts
 	include("deriv_rules.jl")
 	include("vector_dists.jl")
 	include("derive.jl")
 	include("pass1.jl")
 	include("pass2.jl")
-	include("generate.jl")
-
+	include("diff.jl")
 
 end

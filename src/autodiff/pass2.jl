@@ -4,38 +4,28 @@
 function preCalculate(m::ParsingStruct)
     global vhint = Dict()
 
-    body = Expr[ betaAssign(m)..., 
-                 :($ACC_SYM = LLAcc(0.)), 
+    body = Expr[ [ :( $(p[1]) = $(p[2]) ) for p in zip(m.insyms, m.init)]..., 
                  m.exprs...]
     
     vl = getSymbols(body)  # list of all vars (external, parameters, set by model, and accumulator)
     body = vcat(body, 
-    			[ :(vhint[$(Expr(:quote, v))] = $v) for v in vl ], 
-    			:(return $(Expr(:., m.finalacc, Expr(:quote, :val)))) )
-
-	# enclose in a try block to catch zero likelihoods (-Inf log likelihood)
-	body = Expr(:try, Expr(:block, body...),
-			          :e, 
-			          Expr(:block, :(if isa(e, OutOfSupportError); return(-Inf); else; throw(e); end)))
+    			[ :(vhint[$(Expr(:quote, v))] = $v) for v in vl ])
 
 	# identify external vars and add definitions x = Main.x
-	ev = setdiff(m.accanc, union(m.varsset, Set(ACC_SYM, collect(keys(m.pars))...))) # vars that are external to the model
-	vhooks = Expr(:block, [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]...) # assigment block
+	ev = setdiff(m.accanc, union(m.varsset, Set(m.insyms...))) # vars that are external to the model
+	header = [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]
 
 	# build and evaluate the let block containing the function and external vars hooks
-	fn = newvar()
-	body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
-	body = :(let; global $fn; $vhooks; $body; end)
-	
-	eval(body)
-	fn = eval(fn)
+	try
+		eval(Expr(:let, Expr(:block, vcat(header, body)...) ))
+	catch e
+		error("Model fails to evaluate for initial values given")
+	end
 
-	# now evaluate vhint (or throw error if model does not evaluate for given initial values)
-	res = fn(m.init)
+	res = vhint[m.outsym]
 	!isa(res, Real) && error("Model outcome should be a scalar, $(typeof(res)) found")
 	res == -Inf && error("Initial values out of model support, try other values")
 end
-
 
 ######### builds the gradient expression from unfolded expression ##############
 function backwardSweep!(m::ParsingStruct)  

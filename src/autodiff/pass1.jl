@@ -61,11 +61,10 @@ function unfold!(m::ParsingStruct)
 	explore(ex::Exprcomp) =   toExpr(ex)  # unchanged
 	explore(ex::Exprvcat) =   explore(Expr(:call, :vcat, ex.args...) )  # translate to vcat(), and explore
 	explore(ex::Exprtrans) =  explore(Expr(:call, :transpose, ex.args[1]) )  # translate to transpose() and explore
+	explore(ex::Exprdot) =    toExpr(ex)   # unchanged
+	explore(ex::Exprblock) =  mapreduce(explore, (a,b)->b, ex.args)  # process, and return last evaluated
 	explore(ex::Any) =        ex
 
-	explore(ex::Exprdot) =    toExpr(ex)   # unchanged
-
-	explore(ex::Exprblock) =  mapreduce(explore, (a,b)->b, ex.args)  # process, and return last evaluated
 	
 	function explore(ex::Exprequal) 
 		lhs = ex.args[1]
@@ -75,11 +74,11 @@ function unfold!(m::ParsingStruct)
 		rhs = ex.args[2]
 		if isSymbol(rhs) || isa(rhs, Real) || isDot(rhs)
 			push!(m.exprs, Expr(:(=), lhs, rhs))
-			elseif isa(rhs, Expr) 
-				ue = explore(toExprH(rhs)) # explore will return something in this case
-				push!(m.exprs, Expr(:(=), lhs, ue))
+		elseif isa(rhs, Expr) 
+			ue = explore(toExprH(rhs)) # explore will return something in this case
+			push!(m.exprs, Expr(:(=), lhs, ue))
 		else  # unmanaged kind of rhs
-		error("[unfold] can't handle RHS of assignment $(toExpr(ex))")
+			error("[unfold] can't handle RHS of assignment $(toExpr(ex))")
 		end
 		lhs
 	end
@@ -88,11 +87,11 @@ function unfold!(m::ParsingStruct)
 		na = {ex.args[1]}   # function name
 		args = ex.args[2:end]  # arguments
 
-		# if more than 2 arguments, +, sum and * are converted  to nested expressions
+		# if more than 2-ary, conversion to nested binary calls
+		#   applies to +, sum, *, min, max
 		#  (easier for derivation)
-		# TODO : apply to max, min
 		# TODO : apply to other n-ary (n>2) operators ?
-		if contains([:+, :*, :sum], na[1]) 
+		if contains([:+, :*, :sum, :min, :max], na[1]) 
 			while length(args) > 2
 				a2 = pop!(args)
 				a1 = pop!(args)
@@ -123,7 +122,7 @@ end
 function uniqueVars!(m::ParsingStruct)
 	el = m.exprs
 	subst = Dict{Symbol, Symbol}()
-	used = Set(ACC_SYM)
+	used = Set{Symbol}()
 
     for idx in 1:length(el) # idx=4
         # first, substitute in the rhs the variables names that have been renamed
@@ -139,7 +138,7 @@ function uniqueVars!(m::ParsingStruct)
     	end
 	end
 
-	m.finalacc = haskey(subst, ACC_SYM) ? subst[ACC_SYM] : ACC_SYM  # keep reference of potentially renamed accumulator
+	m.outsym = get(subst, m.outsym, m.outsym)  # update name of output var if renamed
 end
 
 ######### identifies vars #############
@@ -156,7 +155,7 @@ function categorizeVars!(m::ParsingStruct)
 
 	m.varsset = mapreduce(lhsSymbol, union, m.exprs)
 
-    local parset = Set{Symbol}(collect(keys(m.pars))...)  # [p.sym for p in m.pars]...)
+    local parset = Set{Symbol}(m.insyms...)  # [p.sym for p in m.pars]...)
     m.pardesc = copy(parset)  # start with parameter symbols
     for ex2 in m.exprs 
     	lhs = lhsSymbol(ex2)
@@ -165,7 +164,7 @@ function categorizeVars!(m::ParsingStruct)
     	!isempty(intersect(rhs, m.pardesc)) && union!(m.pardesc, lhs)
     end
 
-    m.accanc = Set{Symbol}(m.finalacc)
+    m.accanc = Set{Symbol}(m.outsym)
     for ex2 in reverse(m.exprs) # proceed backwards ex2 = reverse(m.exprs)[3]
     	lhs = lhsSymbol(ex2)
         rhs = setdiff(getSymbols(ex2), lhs) # to pickup potential index on lhs as an ancestor
@@ -173,9 +172,8 @@ function categorizeVars!(m::ParsingStruct)
         !isempty(intersect(lhs, m.accanc)) && union!(m.accanc, rhs)
     end
 
-    contains(m.pardesc, m.finalacc) || warn("Model parameters do not seem to influence model outcome")
+    contains(m.pardesc, m.outsym) || warn("Model parameters do not seem to influence model outcome")
 
     local parset2 = setdiff(parset, m.accanc)
     isempty(parset2) || warn("Model parameter(s) $(collect(parset2)) do not seem to influence model outcome")
-
 end
