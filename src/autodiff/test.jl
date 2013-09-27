@@ -193,26 +193,41 @@ end
 X = [1. 2 ; 0  4]
 res = Autodiff.diff(ex, :res, b=12)
 
+######################
+
+srand(1)
+n = 1000
+nbeta = 10 # number of covariates, including intercept
+
+X = [ones(n) randn((n, nbeta-1))]  # covariates
+
+beta0 = randn((nbeta,))
+Y = rand(n) .< ( 1 ./ (1. + exp(-X * beta0)))
+
+# define model
+ex = quote
+    acc = sum( logpdf(Normal(0,1), vars) )
+    prob = 1 / (1. + exp(-X * vars)) 
+    acc = acc + sum(logpdf(Bernoulli(prob), Y))
+end
+
+head, body, rsym = Autodiff.diff(ex, :acc, vars=zeros(nbeta))
+
 using Distributions
-a = [ Normal(1,2), Gamma(1,1)]
-a = [ i<5 for i in 1:10]
+using Base.LinAlg.BLAS
 
-isa(a,Array)
-isa(a,AbstractArray)
-isa(a,Array)
-isa(a,Array{Bool})
-isa(a,AbstractArray{Bool})
-isa(a,Array{Distribution})
-isa(a,AbstractArray{Distribution})
+Distributions.Normal(1,1)
 
-ty{T<:Distribution}(a::Array{T}) = "yes"
-ty{T<:Distribution}(a::AbstractArray{T}) = "yesyes"
-ty(a::Array{Distribution}) = "ad"
-ty(a::AbstractArray{Distribution}) = "aad"
-ty(a) = "no"
+include("myf.jl")
 
-ty(a)
+myf(ones(nbeta))
+myf1000() = (for i in 1:1000 ; myf(ones(nbeta)) ; end )
 
-dump(:(ty{T<:Distribution}(a::Array{T}) = "yes"),10)
+using Profile
+
+@sprofile myf1000()
+sprofile_tree()
+
+
 
 
