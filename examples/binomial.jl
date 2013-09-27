@@ -11,12 +11,12 @@ nbeta = 10 # number of covariates, including intercept
 X = [ones(n) randn((n, nbeta-1))]  # covariates
 
 beta0 = randn((nbeta,))
-Y = rand(n) .< ( 1 ./ (1. + exp(X * beta0))) # logistic response
+Y = float64(rand(n) .< ( 1 ./ (1. + exp(-X * beta0)))) # logistic response
 
 # define model
 ex = quote
 	vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
-	prob = 1 / (1. + exp(X * vars)) 
+	prob = 1 / (1. + exp(-X * vars)) 
 	Y ~ Bernoulli(prob)
 end
 
