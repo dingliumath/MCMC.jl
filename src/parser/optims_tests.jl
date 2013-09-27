@@ -3,7 +3,7 @@ using DataFrames
 
 pwd()
 cd("MCMC.jl/src")
-include("p:/documents/julia/MCMC.jl/src/MCMC.jl") 
+include("p:/documents/julia/MCMC.jl.fredo/src/MCMC.jl") 
 # using MCMC
 
 # simulate dataset
@@ -13,7 +13,7 @@ beta0 = randn((nbeta,))
 
 n = 1000
 X = [ones(n) randn((n, nbeta-1))]
-Y = rand(n) .< ( 1 ./ (1. + exp(X * beta0)))
+Y = float64(rand(n) .< ( 1 ./ (1. + exp(X * beta0))))
 
 # define model
 ex = quote
@@ -21,6 +21,9 @@ ex = quote
 	prob = 1 / (1. + exp(X * vars)) 
 	Y ~ Bernoulli(prob)
 end
+
+f, nb, p, i = MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true)
+f(i)
 
 MCMC.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)
 

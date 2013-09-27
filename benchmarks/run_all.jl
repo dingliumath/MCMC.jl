@@ -11,12 +11,12 @@
 
 using DataFrames
 using Benchmark
-include("p:/documents/julia/MCMC.jl.fredo/src/MCMC.jl") # temporary, for testing
+# include("p:/documents/julia/MCMC.jl.fredo/src/MCMC.jl") # temporary, for testing
 using MCMC
 
 # cd to MCMC package dir to get correct git commit id
 mcmcdir = joinpath(dirname(Base.find_in_path("MCMC")), "..")
-mcmcdir = "p:/documents/julia/MCMC.jl.fredo"  # temporary, for testing
+# mcmcdir = "p:/documents/julia/MCMC.jl.fredo"  # temporary, for testing
 cd(mcmcdir) do 
 	if readall(`git status -s`) != ""
 		println("\nThere are untracked/uncommited changes to the package :")
