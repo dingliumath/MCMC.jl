@@ -109,7 +109,7 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 				push!(body, :( fill!($(symbol("$dsym#1")), 0.) ) )
 				push!(body, :( fill!($(symbol("$dsym#2")), 0.) ) )
 			else
-				error("[generateModelFunction] invalid gradient var type $v $(typeof(vh))")
+				error("[diff] invalid gradient var type $v $(typeof(vh))")
 			end
 		end
 

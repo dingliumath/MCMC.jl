@@ -2,7 +2,7 @@
 #  First attempt at decoupling automatic derivation from MCMC specific
 #    code.
 #
-#  a unique entry point : derive(ex, out::Symbol, in as keyword-args)
+#  a unique entry point : diff(ex, out::Symbol, in as keyword-args)
 #  returns an expression + var allocation expressions + var categorisation
 #
 ############################################################################
@@ -23,11 +23,11 @@ module Autodiff
 	
 	##########  Parameterized type to ease AST exploration  ############
 	type ExprH{H}
-		head::H
+		head::Symbol
 		args::Vector
 		typ::Any
 	end
-	toExprH(ex::Expr) = ExprH(ex.head, ex.args, ex.typ)
+	toExprH(ex::Expr) = ExprH{ex.head}(ex.head, ex.args, ex.typ)
 	toExpr(ex::ExprH) = Expr(ex.head, ex.args...)
 
 	typealias Exprequal    ExprH{:(=)}
@@ -97,19 +97,19 @@ module Autodiff
 	######### structure for parsing model  ##############
 	type ParsingStruct
 		bsize::Int                # length of beta, the parameter vector
-		# pars::PMap                # parameters with their mapping to the beta real vector
-		init::Vector{Float64}     # initial values of beta
-		source::Expr              # model source, after first pass
+		# pars::PMap              # parameters with their mapping to the beta real vector
+		init::Vector 			  # initial values of input variables
+		source::Expr              # model source
 		exprs::Vector{Expr}       # vector of assigments that make the model
 		dexprs::Vector{Expr}      # vector of assigments that make the gradient
-		finalacc::Symbol          # last symbol of loglik accumulator after renaming
+		insyms::Vector{Symbol}    # input vars symbols
+		outsym::Symbol            # output variable name (possibly renamed from initial out argument)
 		varsset::Set{Symbol}      # all the vars set in the model
 		pardesc::Set{Symbol}      # all the vars set in the model that depend on model parameters
 		accanc::Set{Symbol}       # all the vars (possibly external) that influence the accumulator
 	end
-	ParsingStruct() = ParsingStruct(0, Dict{Symbol, PDims}(), Float64[], :(), Expr[], Expr[], ACC_SYM, 
+	ParsingStruct() = ParsingStruct(0, Float64[], :(), Expr[], Expr[], Symbol[], symbol("###"),
 		Set{Symbol}(), Set{Symbol}(), Set{Symbol}())
-
 
 
 	##### now include parsing and derivation scripts
@@ -118,8 +118,5 @@ module Autodiff
 	include("derive.jl")
 	include("pass1.jl")
 	include("pass2.jl")
-	include("generate.jl")
-
-
-
+	include("diff.jl")
 end
