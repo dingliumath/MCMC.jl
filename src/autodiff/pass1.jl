@@ -59,17 +59,20 @@ function unfold!(m::ParsingStruct)
 	explore(ex::Exprline) =   nothing     # remove line info
 	explore(ex::Exprref) =    toExpr(ex)   # unchanged
 	explore(ex::Exprcomp) =   toExpr(ex)  # unchanged
-	explore(ex::Exprvcat) =   explore(Expr(:call, :vcat, ex.args...) )  # translate to vcat(), and explore
+	explore(ex::Exprvcat) =   explore(Expr(:call, :vcat, ex.args...) )  # translate to vcat() call, and explore
 	explore(ex::Exprtrans) =  explore(Expr(:call, :transpose, ex.args[1]) )  # translate to transpose() and explore
 	explore(ex::Exprdot) =    toExpr(ex)   # unchanged
 	explore(ex::Exprblock) =  mapreduce(explore, (a,b)->b, ex.args)  # process, and return last evaluated
+	explore(ex::Exprpequal) = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :+, args[1], args[2])) ) )
+	explore(ex::Exprmequal) = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :-, args[1], args[2])) ) )
+	explore(ex::Exprtequal) = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :*, args[1], args[2])) ) )
+	explore(ex::Exprtrans) = explore(Expr(:call, :transpose, ex.args[1]))
 	explore(ex::Any) =        ex
 
-	
+
 	function explore(ex::Exprequal) 
 		lhs = ex.args[1]
-		assert(typeof(lhs) == Symbol ||  (typeof(lhs) == Expr && lhs.head == :ref),
-			"[unfold] not a symbol on LHS of assigment $ex")
+		isSymbol(lhs) || isRef(lhs) || error("[unfold] not a symbol on LHS of assigment $ex")
 
 		rhs = ex.args[2]
 		if isSymbol(rhs) || isa(rhs, Real) || isDot(rhs)
@@ -88,8 +91,8 @@ function unfold!(m::ParsingStruct)
 		args = ex.args[2:end]  # arguments
 
 		# if more than 2-ary, conversion to nested binary calls
-		#   applies to +, sum, *, min, max
 		#  (easier for derivation)
+		#   applies to +, sum, *, min, max
 		# TODO : apply to other n-ary (n>2) operators ?
 		if contains([:+, :*, :sum, :min, :max], na[1]) 
 			while length(args) > 2
@@ -106,7 +109,7 @@ function unfold!(m::ParsingStruct)
 				push!(m.exprs, :($nv = $ue))
 				push!(na, nv)
 			else
-			push!(na, e2)
+				push!(na, e2)
 			end
 		end
 
@@ -115,6 +118,45 @@ function unfold!(m::ParsingStruct)
 
 	explore(m.source)
 end
+
+
+######### renames variables set several times to make them unique  #############
+# - Stores variables that are changed as they might be necessary for derivation
+# FIXME : algo doesn't work when a variable sets individual elements, x = .. then x[3] = ...; 
+# FIXME 2 : external variables redefined within model are not renamed
+function varGraph!(m::ParsingStruct)
+	vs = Array(Symbol, length(m.exprs))  # will store the variable changed by the statement
+	subst = Dict{Symbol, Symbol}() # will store variable renamings
+	used = Set{Symbol}()  # set of variables
+
+	for i in 1:length(m.exprs)
+        # first, substitute in the rhs the variables names that have been renamed
+		m.exprs[i] = substSymbols(el[idx].args[2], subst)
+
+		if m.exprs[i].head == :(=)   # this is a assignment
+			lhs = m.exprs[i].args[1]
+			vs[i] = isSymbol(lhs) ? lhs : lhs.args[1]
+		else   # this an expression that modifies its parameters (such as gemm!, copy!, etc...)
+		end
+	        # second, rename lhs symbol if set before
+	        lhs = collect(getSymbols(el[idx].args[1]))[1]  # there should be only one
+	        if contains(used, lhs) # if var already set once => create a new one
+	            subst[lhs] = newvar(lhs) # generate new name, add it to substitution list for following statements
+	            el[idx].args[1] = substSymbols(el[idx].args[1], subst)
+	        else # var set for the first time
+		        union!(used, Set(lhs)) 
+	    	end			
+	end
+
+    for idx in 1:length(el) # idx=4
+
+
+	end
+
+	m.outsym = get(subst, m.outsym, m.outsym)  # update name of output var if renamed
+end
+
+
 
 ######### renames variables set several times to make them unique  #############
 # FIXME : algo doesn't work when a variable sets individual elements, x = .. then x[3] = ...; 

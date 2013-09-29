@@ -17,7 +17,7 @@ let
         tmp_11 = Distributions.logpdf(tmp_10,vars)
         acc = sum(tmp_11)
         tmp_12 = -(X)
-        tmp_13 = *(tmp_12,vars)  # 426  (matmul 68) + 361
+        tmp_13 = *(tmp_12,vars)  # 444
         tmp_14 = exp(tmp_13)
         tmp_15 = +(1.0,tmp_14)
         prob = /(1,tmp_15)
@@ -31,7 +31,7 @@ let
         _dacc_2 = 1.0
         fill!(_dtmp_16_1,0.0)
         fill!(_dtmp_16_2,0.0)
-        fill!(_dtmp_17,0.0)
+        fill!(_dtmp_17,0.0)   # 8
         fill!(_dtmp_14,0.0)
         _dtmp_18 = 0.0
         _dacc = 0.0
@@ -40,20 +40,20 @@ let
         _dacc += _dacc_2
         _dtmp_18 += _dacc_2
         for i = 1:length(tmp_17) 
-            _dtmp_17[i] += _dtmp_18
+            _dtmp_17[i] += _dtmp_18   # 9
         end
         for i = 1:length(Y) 
-            _dtmp_16_1[i] += *(/(1.0,+(-(tmp_16[i].p1,1.0),Y[i])),_dtmp_17[i])   # 322+386
+            _dtmp_16_1[i] += *(/(1.0,+(-(tmp_16[i].p1,1.0),Y[i])),_dtmp_17[i])   # 399
         end
         copy!(_dprob,_dtmp_16_1)
         for i = 1:length(_dprob) 
-            _dtmp_15[i] -= /(*(1,_dprob[i]),*(tmp_15[i],tmp_15[i]))  # 187+224
+            _dtmp_15[i] -= /(*(1,_dprob[i]),*(tmp_15[i],tmp_15[i]))  # 327
         end
         for i = 1:length(_dtmp_15)
             _dtmp_14[i] += _dtmp_15[i]
         end
         for i = 1:length(_dtmp_14) 
-            _dtmp_13[i] += *(exp(tmp_13[i]),_dtmp_14[i])  # 179+162
+            _dtmp_13[i] += *(exp(tmp_13[i]),_dtmp_14[i])  # 237
         end
         Base.LinAlg.BLAS.gemm!('T','N',1.0,tmp_12,reshape(_dtmp_13,length(_dtmp_13),1),1.0,_dvars)
         for i = 1:length(tmp_11) 

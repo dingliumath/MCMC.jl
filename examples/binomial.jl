@@ -11,7 +11,7 @@ nbeta = 10 # number of covariates, including intercept
 X = [ones(n) randn((n, nbeta-1))]  # covariates
 
 beta0 = randn((nbeta,))
-Y = float64(rand(n) .< ( 1 ./ (1. + exp(-X * beta0)))) # logistic response
+Y = rand(n) .< ( 1 ./ (1. + exp(-X * beta0))) # logistic response
 
 # define model
 ex = quote
