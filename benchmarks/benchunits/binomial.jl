@@ -6,7 +6,7 @@ n = 1000
 nbeta = 10 # number of predictors, including intercept
 X = [ones(n) randn((n, nbeta-1))]
 beta0 = randn((nbeta,))
-Y = float64(rand(n) .< ( 1 ./ (1. + exp(X * beta0))))
+Y = rand(n) .< ( 1 ./ (1. + exp(X * beta0)))
 
 # define model
 ex = quote

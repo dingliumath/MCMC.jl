@@ -33,7 +33,11 @@ function diff(model::Expr, out::Symbol; init...)
 		vh = vhint[v]
 		dsym = dprefix(v)
 		if isa(vh, Real)
-			push!(body, :($dsym = 0.) )
+			if v == m.outsym
+				push!(body, :($dsym = 1.) )  # if final result backward propagation starts with 1.0 
+			else
+				push!(body, :($dsym = 0.) )
+			end			
 		# elseif 	isa(vh, LLAcc)
 		# 	push!(body, :($dsym = 0.) )
 		elseif 	isa(vh, Array{Float64})

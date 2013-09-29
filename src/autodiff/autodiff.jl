@@ -3,7 +3,7 @@
 #    code.
 #
 #  a unique entry point : diff(ex, out::Symbol, in as keyword-args)
-#  returns an expression + var allocation expressions + var categorisation
+#  returns an expression + var allocation expressions
 #
 ############################################################################
 
@@ -39,7 +39,7 @@ module Autodiff
 	typealias Exprcomp     ExprH{:comparison}
 	typealias Exprdot      ExprH{:.}
 
-	## variable symbol survey functions
+	## variable symbol sampling functions
 	getSymbols(ex::Any) =        Set{Symbol}()
 	getSymbols(ex::Symbol) =     Set{Symbol}(ex)
 	getSymbols(ex::Array) =      mapreduce(getSymbols, union, ex)
@@ -85,6 +85,11 @@ module Autodiff
 			vcount[radix] = haskey(vcount, radix) ? vcount[radix]+1 : 1
 			return symbol("$radix#$(vcount[radix])")
 		end
+
+		global resetvar
+		function resetvar()
+			vcount = Dict()
+		end
 	end
 
 	immutable PDims
@@ -96,10 +101,6 @@ module Autodiff
 	######### structure for parsing model  ##############
 	type ParsingStruct
 		bsize::Int                # length of beta, the parameter vector
-		pars::PMap                # parameters with their mapping to the beta real vector
-		init::Vector{Float64}     # initial values of beta
-		source::Expr              # model source, after first pass
-		# pars::PMap              # parameters with their mapping to the beta real vector
 		init::Vector 			  # initial values of input variables
 		source::Expr              # model source
 		exprs::Vector{Expr}       # vector of assigments that make the model

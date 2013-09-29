@@ -184,6 +184,13 @@ Abcd.debug(ex2, vars=0.0)  # no method Bernoulli(Array{Float64,1},)
 @unix_only include("/home/fredo/devl/MCMC.jl.fredo/src/autodiff/Autodiff.jl")
 
 
+m = Autodiff.ParsingStruct()
+m.source = :( a = 45 ; b += 45; copy!(b,a); c = X')
+Autodiff.unfold!(m)
+m.exprs
+
+
+
 ex = quote
 	a = b+56
 	a = a + exp(X)
@@ -192,6 +199,8 @@ end
 
 X = [1. 2 ; 0  4]
 res = Autodiff.diff(ex, :res, b=12)
+
+Autodiff.diff(:( copy!(a,b) ), :a, b=1)
 
 ######################
 
@@ -221,11 +230,13 @@ Distributions.Normal(1,1)
 include("myf.jl")
 
 myf(ones(nbeta))
-myf1000() = (for i in 1:1000 ; myf(ones(nbeta)) ; end )
+myf10000() = (for i in 1:1000 ; myf(ones(nbeta)) ; end )
 
 using Profile
 
-@sprofile myf1000()
+myf10000()
+sprofile_clear()
+@sprofile myf10000()
 sprofile_tree()
 
 
