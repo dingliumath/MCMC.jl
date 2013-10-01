@@ -57,18 +57,25 @@ function unfold!(m::ParsingStruct)
 	explore(ex::Expr) =       explore(toExprH(ex))
 	explore(ex::ExprH) =      error("[unfold] unmanaged expr type $(ex.head) in ($ex)")
 	explore(ex::Exprline) =   nothing     # remove line info
-	explore(ex::Exprref) =    toExpr(ex)   # unchanged
+	explore(ex::Exprref) =    toExpr(ex)  # unchanged
 	explore(ex::Exprcomp) =   toExpr(ex)  # unchanged
 	explore(ex::Exprvcat) =   explore(Expr(:call, :vcat, ex.args...) )  # translate to vcat() call, and explore
 	explore(ex::Exprtrans) =  explore(Expr(:call, :transpose, ex.args[1]) )  # translate to transpose() and explore
 	explore(ex::Exprdot) =    toExpr(ex)   # unchanged
-	explore(ex::Exprblock) =  mapreduce(explore, (a,b)->b, ex.args)  # process, and return last evaluated
+	# explore(ex::Exprblock) =  mapreduce(explore, (a,b)->b, ex.args)  # process, and return last evaluated
 	explore(ex::Exprpequal) = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :+, args[1], args[2])) ) )
 	explore(ex::Exprmequal) = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :-, args[1], args[2])) ) )
 	explore(ex::Exprtequal) = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :*, args[1], args[2])) ) )
 	explore(ex::Exprtrans) = explore(Expr(:call, :transpose, ex.args[1]))
 	explore(ex::Any) =        ex
 
+	function explore(ex::Exprblock)
+		for i in 1:length(ex.args)
+			re = explore(ex.args[i])
+			println("--- $re ---")
+			re==nothing || push!(m.exprs, re)
+		end
+	end
 
 	function explore(ex::Exprequal) 
 		lhs = ex.args[1]
@@ -83,7 +90,8 @@ function unfold!(m::ParsingStruct)
 		else  # unmanaged kind of rhs
 			error("[unfold] can't handle RHS of assignment $(toExpr(ex))")
 		end
-		lhs
+		return nothing
+		# lhs
 	end
 
 	function explore(ex::Exprcall) 
@@ -119,44 +127,105 @@ function unfold!(m::ParsingStruct)
 	explore(m.source)
 end
 
-
-######### renames variables set several times to make them unique  #############
-# - Stores variables that are changed as they might be necessary for derivation
+######### analyzes and transforms for derivation #############
+# - makes variables set several times unique (necessary for back propagation)
+# - processes functions that transform their arguments (copy!, gemm!, etc...)
+# - builds the variable dependency graph
 # FIXME : algo doesn't work when a variable sets individual elements, x = .. then x[3] = ...; 
-# FIXME 2 : external variables redefined within model are not renamed
-function varGraph!(m::ParsingStruct)
-	vs = Array(Symbol, length(m.exprs))  # will store the variable changed by the statement
-	subst = Dict{Symbol, Symbol}() # will store variable renamings
-	used = Set{Symbol}()  # set of variables
+function varGraph(vex::Vector{Expr})
+	subst = Dict{Symbol, Symbol}()     # will store variable renamings
+	used = Set{Symbol}()               # variables used
+	touched = Set{Symbol}()            # variables set
+	external = Set{Symbol}()           # variables defined outside
+	vg = Dict{Symbol, Set{Symbol}}()  # dependency graph
 
-	for i in 1:length(m.exprs)
-        # first, substitute in the rhs the variables names that have been renamed
-		m.exprs[i] = substSymbols(el[idx].args[2], subst)
+	nvex = Expr[]                      # returned transformed vector of expressions
 
-		if m.exprs[i].head == :(=)   # this is a assignment
-			lhs = m.exprs[i].args[1]
-			vs[i] = isSymbol(lhs) ? lhs : lhs.args[1]
-		else   # this an expression that modifies its parameters (such as gemm!, copy!, etc...)
-		end
-	        # second, rename lhs symbol if set before
-	        lhs = collect(getSymbols(el[idx].args[1]))[1]  # there should be only one
-	        if contains(used, lhs) # if var already set once => create a new one
-	            subst[lhs] = newvar(lhs) # generate new name, add it to substitution list for following statements
-	            el[idx].args[1] = substSymbols(el[idx].args[1], subst)
-	        else # var set for the first time
-		        union!(used, Set(lhs)) 
-	    	end			
+
+	explore(ex::Expr) =       explore(toExprH(ex))
+	explore(ex::ExprH) =      error("[varGraph!] unmanaged expr type $(ex.head) in ($ex)")
+	
+	function explore(ex::Exprcall)
+		#  where to look for changed variable, TODO : generalize, make user settable
+		const inplace_var = {:copy! => 1, :gemm! => 7 }
+
+		fn = ex.args[1]
+		fa = ex.args[2:end]
+
+		haskey(inplace_var, fn) || error("[varGraph!] unknown function $(ex.args[1])")
+
+		ex = substSymbols(ex, subst) # first, do renaming
+
+		lhss = fa[ get(inplace_var, fn, 1) ]
+		assert(isSymbol(lhss), "[varGraph!] expected symbol got $lhss in $ex")
+
+		rhss = getSymbols( fa[ 1:length(fa) .!= get(inplace_var, fn, 1) ] )
+
+		external = union(external, {setdiff(rhss, touched)...})
+		used = union(used, {rhss...})
+
+		contains(external, lhss) && error("$lhss is both an external variable and a variable set by the model")
+
+		if contains(touched, lhss) # ex is setting an already used variable => new var creation
+			subst[lhss] = newvar(lhss) # generate new name, add it to substitution list for following statements
+	        ex.args[2:end] = substSymbols(fa, subst) # replace in lhs
+	        push!(nvex, :( $(subst[lhss]) = similar($lhss) ) ) # need to allocate variable in this case
+	    end
+
+		add!(touched, get(subst, lhss, lhss))
+		push!(nvex, ex)
+		vg[get(subst, lhss, lhss)] = rhss
 	end
 
-    for idx in 1:length(el) # idx=4
+	function explore(ex::Exprequal)
+		ex = substSymbols(ex, subst) # first, do renaming
 
+		lhs = ex.args[1]
+		lhss = isSymbol(lhs) ? lhs : lhs.args[1]  # extract only symbol if ref
+		rhss = getSymbols(ex.args[2])
+		external = union(external, {setdiff(rhss, touched)...})
+		used = union(used, {rhss...})
 
+		contains(external, lhss) && error("$lhss is both an external var and set by the model")
+
+		if contains(touched, lhss) # ex is setting an already used variable => new var creation
+			subst[lhss] = newvar(lhss) # generate new name, add it to substitution list for following statements
+	        ex.args[1] = substSymbols(lhs, subst) # replace in lhs
+	    end
+
+		add!(touched, get(subst, lhss, lhss))
+
+		push!(nvex, ex)
+		vg[get(subst, lhss, lhss)] = rhss
 	end
 
-	m.outsym = get(subst, m.outsym, m.outsym)  # update name of output var if renamed
+	map(explore, vex)
+
+	(used, touched, external, vg, nvex)
+	# println("#### $nvex ####")
+	# println("used $used")
+	# println("touched $touched")
+	# println("external $external")
+	# println("substitutions $subst")
+	# println("graph  $vg")
 end
 
+function prepare!(m::ParsingStruct)
 
+	m.used, m.touched, m.external, vg, m.exprs = varGraph(m.exprs)
+	
+	haskey(vg, m.outsym) || error("expression outcome does appear in expression")
+
+	ancestors(v::Symbol) = union(Set(v), haskey(vg, v) ? mapreduce(explore, union, vg[v]) : Set())
+
+	mi = setdiff(m.insyms, ancestors(m.outsym))
+	length(mi) == 0 || error("input params $mi do not appear to influence outcome")
+
+	children(v::Symbol) = 
+	m.avars = intersect()
+	m.exprs = 
+
+end
 
 ######### renames variables set several times to make them unique  #############
 # FIXME : algo doesn't work when a variable sets individual elements, x = .. then x[3] = ...; 

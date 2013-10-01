@@ -4,12 +4,8 @@
 
 using Base.Test
 
-# FIXME : change to MCMC when ready
-# using MCMC
-include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
-testedmod = Abcd  
-
-
+include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/Autodiff.jl")
+testedmod = Autodiff
 
 @test testedmod.isSymbol(:a)            == true
 @test testedmod.isSymbol(:(a[1]))       == false
@@ -73,4 +69,30 @@ smap = {:a => :x, :b => :y}
 @test testedmod.substSymbols(:(z.a[x]), smap)          == :(z.a[x])  # note : no subst on field names
 @test testedmod.substSymbols(:(z[x].a), smap)          == :(z[x].a)  # note : no subst on field names
 @test testedmod.substSymbols(:(a[x].z), smap)          == :(x[x].z)  
+
+
+## expression unfolding
+macro unfold(ex)
+	m = testedmod.ParsingStruct()
+	m.source = ex
+	testedmod.resetvar()  # needed to have a constant temporary var name generated
+	testedmod.unfold!(m)
+	m.exprs
+end
+
+@test (@unfold a = b+6)           == [:(a=b+6)]
+@test (@unfold (sin(y);a=3))      == [:(sin(y)), :(a=3)]
+@test (@unfold a[4] = b+6)        == [:(a[4]=b+6)]
+@test (@unfold a += b+6)          == [:($(symbol("tmp#1"))=b+6), :(a = +(a,$(symbol("tmp#1"))))]
+@test (@unfold a -= b+6)          == [:($(symbol("tmp#1"))=b+6), :(a = -(a,$(symbol("tmp#1"))))]
+@test (@unfold a *= b+6)          == [:($(symbol("tmp#1"))=b+6), :(a = *(a,$(symbol("tmp#1"))))]
+@test (@unfold b = a')            == [:(b=transpose(a))]
+@test (@unfold a = [1,2])         == [:(a=vcat(1,2))]
+@test_throws (@unfold a.b = 3.) 
+@test (@unfold a = b.f)           == [:(a=b.f)]
+@test (@unfold a = b.f[i])        == [:(a=b.f[i])]
+@test (@unfold a = b[j].f[i])     == [:(a=b[j].f[i])]
+
+
+
 
