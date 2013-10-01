@@ -118,14 +118,14 @@ end
 @dfunc abs(x::Real )       x     dx += sign(x) * ds
 @dfunc abs(x::AbstractArray)       x     for i in 1:length(ds) ; dx[i] += sign(x[i]) * ds[i] ;end
 
-@dfunc max(x::Real , y::Real )   x     dx += (x > y) * ds
-@dfunc max(x::Real , y::AbstractArray)   x     for i in 1:length(ds) ; dx += (x > y[i]) * ds[i] ; end
-@dfunc max(x::AbstractArray, y::Real )   x     for i in 1:length(ds) ; dx[i] += (x[i] > y) * ds[i] ; end
-@dfunc max(x::AbstractArray, y::AbstractArray)   x     for i in 1:length(ds) ; dx[i] += (x[i] > y[i]) * ds[i] ; end
-@dfunc max(x::Real , y::Real )   y     dy += (x < y) * ds
-@dfunc max(x::Real , y::AbstractArray)   y     for i in 1:length(ds) ; dy[i] += (x < y[i]) * ds[i] ; end
-@dfunc max(x::AbstractArray, y::Real )   y     for i in 1:length(ds) ; dy += (x[i] < y) * ds[i] ; end
-@dfunc max(x::AbstractArray, y::AbstractArray)   y     for i in 1:length(ds) ; dy[i] += (x[i] < y[i]) * ds[i] ; end
+@dfunc max(x::Real , 			y::Real )   		x     dx += (x > y) * ds
+@dfunc max(x::Real , 			y::AbstractArray)   x     for i in 1:length(ds) ; dx += (x > y[i]) * ds[i] ; end
+@dfunc max(x::AbstractArray, 	y::Real )   		x     for i in 1:length(ds) ; dx[i] += (x[i] > y) * ds[i] ; end
+@dfunc max(x::AbstractArray, 	y::AbstractArray)	x     for i in 1:length(ds) ; dx[i] += (x[i] > y[i]) * ds[i] ; end
+@dfunc max(x::Real , 			y::Real )   		y     dy += (x < y) * ds
+@dfunc max(x::Real , 			y::AbstractArray)   y     for i in 1:length(ds) ; dy[i] += (x < y[i]) * ds[i] ; end
+@dfunc max(x::AbstractArray, 	y::Real )   		y     for i in 1:length(ds) ; dy += (x[i] < y) * ds[i] ; end
+@dfunc max(x::AbstractArray, 	y::AbstractArray)   y     for i in 1:length(ds) ; dy[i] += (x[i] < y[i]) * ds[i] ; end
 
 @dfunc min(x::Real , y::Real )   x     dx += (x < y) * ds
 @dfunc min(x::Real , y::AbstractArray)   x     for i in 1:length(ds) ; dx += (x < y[i]) * ds[i] ; end
@@ -230,7 +230,7 @@ end
 					dd2 += (d.a <= x <= d.b) / (d.a - d.b) * ds )
 
 ## Weibull distribution
-@dlogpdfd Weibull   ( dd1 += ((1. - (x/d.scale)^d.shape) * log(x/d.scale) + 1./d.shape) * ds ;
+@dlogpdfd Weibull   ( 	dd1 += ((1. - (x/d.scale)^d.shape) * log(x/d.scale) + 1./d.shape) * ds ;
 						dd2 += ((x/d.scale)^d.shape - 1.) * d.shape/d.scale * ds )
 @dlogpdfx Weibull   dx += ((1. - (x/d.scale)^d.shape) * d.shape - 1.) / x * ds
 

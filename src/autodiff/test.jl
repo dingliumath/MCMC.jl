@@ -183,42 +183,84 @@ Abcd.debug(ex2, vars=0.0)  # no method Bernoulli(Array{Float64,1},)
 @windows_only include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/Autodiff.jl")
 @unix_only include("/home/fredo/devl/MCMC.jl.fredo/src/autodiff/Autodiff.jl")
 
+#############################
+	m = Autodiff.ParsingStruct()
+	m.source = :( a = 45 ; b += 45; copy!(b,a); c = X')
+	Autodiff.unfold!(m)
+	m.exprs
 
-m = Autodiff.ParsingStruct()
-m.source = :( a = 45 ; b += 45; copy!(b,a); c = X')
-Autodiff.unfold!(m)
-m.exprs
+#############################
+	ex = quote
+		a = b+56
+		a = a + exp(X)
+		res = sum(a)
+	end
 
+	X = [1. 2 ; 0  4]
+	res = Autodiff.diff(ex, :res, b=12)
 
+	Autodiff.diff(:( copy!(a,b) ), :a, b=1)
 
-ex = quote
-	a = b+56
-	a = a + exp(X)
-	res = sum(a)
-end
+#############################
+	ex = quote
+		a = b+56
+		copy!(b,a)
+		res = sum(a)
+	end
 
-X = [1. 2 ; 0  4]
-res = Autodiff.diff(ex, :res, b=12)
+	res = Autodiff.diff(ex, :res, b=12)
+	m = Autodiff.ParsingStruct()
+	m.source = ex
+	m.insyms = [:b]
+	m.outsym= :res
+	Autodiff.unfold!(m)
+	m.exprs
+#############################
+	m = Autodiff.ParsingStruct()
+	m.exprs = [:(a=b+3), :(c=a*2), :(c=a*3), :(d=a+c)]
+	Autodiff.varGraph!(m)
+	m.exprs = [:(a=b+3), :(b=c*2)]
+	Autodiff.varGraph!(m)
 
-Autodiff.diff(:( copy!(a,b) ), :a, b=1)
+	m.exprs = [:(a=b+3), :(c=a*2), :(d=log(c)), :(c=c+5)]
+	Autodiff.varGraph!(m)
+	m.exprs = [:(a=b+3), :(c=a*2), :(d=log(c)), :(c=c+5), :(e=sin(c))]
+	Autodiff.varGraph!(m)
+
+	Autodiff.varGraph([:(a=b+3), :(copy!(c,a)), :(c=c+5), :(e=sin(c))])
+	Autodiff.varGraph([:(a=b+3), :(c=3), :(c=c+5), :(copy!(c,a)), :(e=sin(c))])
+	Autodiff.varGraph([:(a=b+3), :(c=a+5), :(copy!(c,a)), :(e=sin(c))])
+
+	m.exprs = [:(a=b+3), :(c=3), :(c=c+5), :(copy!(c,a)), :(e=sin(c))]
+	Autodiff.varGraph!(m)
+
+	Autodiff.diff(:( copy!(a,b) ), :a, b=1)
+
+	explore(v::Symbol) = union(Set(v), haskey(vg, v) ? mapreduce(explore, union, vg[v]) : Set())
+vg = [ :c => Set{Symbol}(:a),
+	symbol("c#4") => Set{Symbol}(:a),
+	:e => Set{Symbol}(symbol("c#4")),
+	:a => Set{Symbol}(:b)] 
+
+explore(:e) 
+haskey(vg, :e)
 
 ######################
+	srand(1)
+	n = 1000
+	nbeta = 10 # number of covariates, including intercept
 
-srand(1)
-n = 1000
-nbeta = 10 # number of covariates, including intercept
+	X = [ones(n) randn((n, nbeta-1))]  # covariates
 
-X = [ones(n) randn((n, nbeta-1))]  # covariates
+	beta0 = randn((nbeta,))
+	Y = rand(n) .< ( 1 ./ (1. + exp(-X * beta0)))
 
-beta0 = randn((nbeta,))
-Y = rand(n) .< ( 1 ./ (1. + exp(-X * beta0)))
-
-# define model
-ex = quote
-    acc = sum( logpdf(Normal(0,1), vars) )
-    prob = 1 / (1. + exp(-X * vars)) 
-    acc = acc + sum(logpdf(Bernoulli(prob), Y))
-end
+	# define model
+	ex = quote
+	    acc = sum( logpdf(Normal(0,1), vars) )
+	    prob = 1 / (1. + exp(-X * vars)) 
+	    acc = acc + sum(logpdf(Bernoulli(prob), Y))
+	end
 
 head, body, rsym = Autodiff.diff(ex, :acc, vars=zeros(nbeta))
 

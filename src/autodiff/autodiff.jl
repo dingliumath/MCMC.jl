@@ -55,7 +55,7 @@ module Autodiff
 	## variable symbol subsitution functions
 	substSymbols(ex::Any, smap::Dict) =           ex
 	substSymbols(ex::Expr, smap::Dict) =          substSymbols(toExprH(ex), smap::Dict)
-	substSymbols(ex::Vector{Expr}, smap::Dict) =  map(e -> substSymbols(e, smap), ex)
+	substSymbols(ex::Vector, smap::Dict) =        map(e -> substSymbols(e, smap), ex)
 	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
 	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
 	substSymbols(ex::Exprdot, smap::Dict) =       (ex = toExpr(ex) ; ex.args[1] = substSymbols(ex.args[1], smap) ; ex)
@@ -110,9 +110,11 @@ module Autodiff
 		varsset::Set{Symbol}      # all the vars set in the model
 		pardesc::Set{Symbol}      # all the vars set in the model that depend on model parameters
 		accanc::Set{Symbol}       # all the vars (possibly external) that influence the accumulator
+	
+		ParsingStruct() = new()   # uninitialized constructor
 	end
-	ParsingStruct() = ParsingStruct(0, Float64[], :(), Expr[], Expr[], Symbol[], symbol("###"),
-		Set{Symbol}(), Set{Symbol}(), Set{Symbol}())
+	# ParsingStruct() = ParsingStruct(0, Float64[], :(), Expr[], Expr[], Symbol[], symbol("###"),
+	# 	Set{Symbol}(), Set{Symbol}(), Set{Symbol}())
 
 	#### Log-likelihood accumulator type  ####
 	# this makes the model function easier to generate compared to a Float64
