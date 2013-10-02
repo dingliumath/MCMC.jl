@@ -1,7 +1,6 @@
 ############################################################################
-#  Main function definition
+#  Main derivation function
 ############################################################################
-
 
 function diff(model::Expr, out::Symbol; init...)
 	## checks initial values
@@ -12,10 +11,26 @@ function diff(model::Expr, out::Symbol; init...)
 	m.insyms = map(sv->sv[1], init)
 	m.init = map(sv->sv[2], init)
 	m.source = model
+	m.exprs = Expr[]
+	m.dexprs = Expr[]
 
 	unfold!(m)	
-	uniqueVars!(m)
-	categorizeVars!(m)
+
+	m.ag, m.dg, subst, m.exprs = varGraph(m.exprs)
+	
+	# update new name of outcome variable
+	follow(s) = haskey(subst,s) ? follow(subst[s]) : s
+	m.outsym = follow(m.outsym)
+
+	### controls 
+	relations(m.outsym, m.ag) == Set() && error("outcome variable is not set or is constant")
+
+	ui = setdiff(Set(m.insyms...), relations(m.outsym, m.ag))
+	ui != Set() && error("some input variables ($ui) do not influence outcome")
+
+	# uniqueVars!(m)
+	# categorizeVars!(m)
+
 	preCalculate(m)
 	backwardSweep!(m)
 
@@ -25,10 +40,9 @@ function diff(model::Expr, out::Symbol; init...)
 	body = copy(m.exprs)
 
 	# identify external vars and add definitions x = Main.x
-	ev = setdiff(m.accanc, union(m.varsset, Set(m.insyms...))) # vars that are external to the model
-	header = [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]
+	header = [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in external(m)]
 
-	avars = intersect(m.accanc, m.pardesc) # active vars
+	avars = activeVars(m) # active vars
 	for v in avars 
 		vh = vhint[v]
 		dsym = dprefix(v)
