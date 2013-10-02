@@ -11,6 +11,15 @@ module Autodiff
 
 	using Distributions
 	using Base.LinAlg.BLAS
+<<<<<<< HEAD:src/autodiff/autodiff.jl
+=======
+
+	export getSymbols, substSymbols, diff, @dfunc, dfunc
+
+	# naming conventions
+	const TEMP_NAME = "tmp"     # prefix of temporary variables in log-likelihood function
+	const DERIV_PREFIX = "_d"   # prefix of gradient variables
+>>>>>>> autodiff module seems ok, now on Sandbox module:src/autodiff/Autodiff.jl
 	
 	export generateModelFunction
 	export PDims, PMap
@@ -107,15 +116,22 @@ module Autodiff
 		dexprs::Vector{Expr}      # vector of assigments that make the gradient
 		insyms::Vector{Symbol}    # input vars symbols
 		outsym::Symbol            # output variable name (possibly renamed from initial out argument)
-		varsset::Set{Symbol}      # all the vars set in the model
+		# varsset::Set{Symbol}    # all the vars set in the model
+		# pardesc::Set{Symbol}    # all the vars set in the model that depend on model parameters
+		# accanc::Set{Symbol}     # all the vars (possibly external) that influence the accumulator
+		touched::Set{Symbol}      # all the vars set in the model
 		pardesc::Set{Symbol}      # all the vars set in the model that depend on model parameters
 		accanc::Set{Symbol}       # all the vars (possibly external) that influence the accumulator
-	
+
+		ag::Dict  # variable ancestors graph
+		dg::Dict  # variable decendants graph
+
+		vhint					  # stores all expression values to match adequate derivation rule
+
 		ParsingStruct() = new()   # uninitialized constructor
 	end
-	# ParsingStruct() = ParsingStruct(0, Float64[], :(), Expr[], Expr[], Symbol[], symbol("###"),
-	# 	Set{Symbol}(), Set{Symbol}(), Set{Symbol}())
 
+<<<<<<< HEAD:src/autodiff/autodiff.jl
 	#### Log-likelihood accumulator type  ####
 	# this makes the model function easier to generate compared to a Float64
 	#   - embeds the error throwing when log-likelihood reaches -Inf
@@ -131,11 +147,20 @@ module Autodiff
 	end
 	+(ll::LLAcc, x::Real) = LLAcc(ll.val + x)
 	+(ll::LLAcc, x::Array{Float64}) = LLAcc(ll.val + sum(x))
+=======
+	# find variables in dependency graph g
+	relations(v::Symbol, g) = haskey(g, v) ? union( g[v], relations(g[v] ,g) ) : Set()
+	relations(vs::Vector, g) = union( map( s->relations(s,g) , vs)... )
+	relations(vs::Set, g) = union( map( s->relations(s,g) , [vs...])... )
+
+	# active variables whose gradient need to be calculated
+	activeVars(m::ParsingStruct) = intersect(relations(m.outsym, m.ag), relations(m.insyms, m.dg))
+	# variables that are not defined in expression and are not input variables
+	external(m::ParsingStruct) = setdiff(union(values(m.ag)...), union(Set(keys(m.ag)...), Set(m.insyms...)))
+>>>>>>> autodiff module seems ok, now on Sandbox module:src/autodiff/Autodiff.jl
 
 	##### now include parsing and derivation scripts
 	include("deriv_rules.jl")
-	include("vector_dists.jl")
-	include("derive.jl")
 	include("pass1.jl")
 	include("pass2.jl")
 	include("diff.jl")

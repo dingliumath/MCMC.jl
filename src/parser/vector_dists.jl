@@ -1,9 +1,6 @@
 ############# Distribution types vectorizations   ################
 # single parameter distributions
-import Distributions.Bernoulli, 
-	Distributions.TDist, 
-	Distributions.Exponential, 
-	Distributions.Poisson
+import Distributions: Bernoulli, TDist, Exponential, Poisson
 
 for d in [:Bernoulli, :TDist, :Exponential, :Poisson]  
 	@eval begin
@@ -18,14 +15,7 @@ for d in [:Bernoulli, :TDist, :Exponential, :Poisson]
 end
 
 # two parameter distributions
-import Distributions.Normal, 
-		Distributions.Uniform, 
-		Distributions.Weibull, 
-		Distributions.Gamma, 
-		Distributions.Cauchy, 
-		Distributions.LogNormal, 
-		Distributions.Binomial, 
-		Distributions.Beta
+import Distributions: Normal, Uniform, Weibull, Gamma, Cauchy, LogNormal, Binomial, Beta
 
 for d in [:Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
 	@eval begin
@@ -41,6 +31,7 @@ end
 
 ############# logpdf vectorization on the distribution argument   ################
 import Distributions.logpdf
+
 function logpdf{T<:Distribution}(ds::Array{T}, x::AbstractArray)
 	res = Array(Float64, size(ds))
 	assert( size(ds) == size(x), "x and distributions sizes do not match")

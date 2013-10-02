@@ -188,7 +188,6 @@ Abcd.debug(ex2, vars=0.0)  # no method Bernoulli(Array{Float64,1},)
 	m.source = :( a = 45 ; b += 45; copy!(b,a); c = X')
 	Autodiff.unfold!(m)
 	m.exprs
-
 #############################
 	ex = quote
 		a = b+56
@@ -200,7 +199,6 @@ Abcd.debug(ex2, vars=0.0)  # no method Bernoulli(Array{Float64,1},)
 	res = Autodiff.diff(ex, :res, b=12)
 
 	Autodiff.diff(:( copy!(a,b) ), :a, b=1)
-
 #############################
 	ex = quote
 		a = b+56
@@ -233,14 +231,60 @@ Abcd.debug(ex2, vars=0.0)  # no method Bernoulli(Array{Float64,1},)
 
 	m.exprs = [:(a=b+3), :(c=3), :(c=c+5), :(copy!(c,a)), :(e=sin(c))]
 	Autodiff.varGraph!(m)
+#############################
 
-	Autodiff.diff(:( copy!(a,b) ), :a, b=1)
+	srand(1)
+	n = 1000
+	nbeta = 10 # number of covariates, including intercept
+	X = [ones(n) randn((n, nbeta-1))]  # covariates
+	beta0 = randn((nbeta,))
+	Y = rand(n) .< ( 1 ./ (1. + exp(-X * beta0)))
+
+	model = quote
+			acc = 0.0
+			acc += sum( logpdf(Normal(0,1), vars) )
+		    prob = 1 / (1. + exp(-X * vars)) 
+		    acc += sum( logpdf(Bernoulli(prob), Y))
+	end
+
+	Autodiff.diff(model, :acc, vars=zeros(nbeta))
+	
+	m = Autodiff.ParsingStruct()
+	m.outsym = :acc
+	m.insyms = [:vars]
+	m.init = zeros(5)
+	m.source = model
+	m.exprs = Expr[]
+
+	Autodiff.unfold!(m)	
+	m.exprs
+	m.ag, m.dg, subst, m.exprs = Autodiff.varGraph(m.exprs)
+	m.exprs
+	follow(s) = haskey(subst,s) ? follow(subst[s]) : s
+	m.outsym = follow(m.outsym)
+	m.ag
+	Autodiff.relations(m.outsym, m.ag)
+	ui = setdiff(Set(m.insyms...), Autodiff.relations(m.outsym, m.ag))
+	ui != Set() && error("some input variables ($ui) do not influence outcome")
+
+	Autodiff.relations(m.insyms, m.dg)
+	Autodiff.relations(:Y, m.dg)
+
+	m.ag, m.dg, m.exprs = varGraph(m.exprs)
+
+
+
+	Autodiff.diff(:( copy!(a,b) ; acc = a^x ), :acc, b=1)
 
 	explore(v::Symbol) = union(Set(v), haskey(vg, v) ? mapreduce(explore, union, vg[v]) : Set())
 vg = [ :c => Set{Symbol}(:a),
 	symbol("c#4") => Set{Symbol}(:a),
 	:e => Set{Symbol}(symbol("c#4")),
 	:a => Set{Symbol}(:b)] 
+
+	ancestors(v::Symbol) = union(Set(v), haskey(vg, v) ? mapreduce(ancestors, union, vg[v]) : Set())
+	ancestors(v::Symbol) = haskey(vg, v) ? union(vg[v], map(ancestors, [vg[v]...])...) : Set()
+ancestors(:e)
 
 explore(:e) 
 haskey(vg, :e)

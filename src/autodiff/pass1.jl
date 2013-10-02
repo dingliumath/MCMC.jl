@@ -72,7 +72,6 @@ function unfold!(m::ParsingStruct)
 	function explore(ex::Exprblock)
 		for i in 1:length(ex.args)
 			re = explore(ex.args[i])
-			println("--- $re ---")
 			re==nothing || push!(m.exprs, re)
 		end
 	end
@@ -137,7 +136,7 @@ function varGraph(vex::Vector{Expr})
 	used = Set{Symbol}()               # variables used
 	touched = Set{Symbol}()            # variables set
 	external = Set{Symbol}()           # variables defined outside
-	vg = Dict{Symbol, Set{Symbol}}()  # dependency graph
+	vg = Dict{Symbol, Set{Symbol}}()   # dependency graph
 
 	nvex = Expr[]                      # returned transformed vector of expressions
 
@@ -201,30 +200,21 @@ function varGraph(vex::Vector{Expr})
 
 	map(explore, vex)
 
-	(used, touched, external, vg, nvex)
+	# invert dependency graph
+	vgi = Dict{Symbol, Set}()
+	for (k,v) in vg
+		for s in v
+			haskey(vgi,s) ? add!(vgi[s], k) : (vgi[s] = Set(k))
+		end
+	end
+
+	(vg, vgi, subst, nvex)
 	# println("#### $nvex ####")
 	# println("used $used")
 	# println("touched $touched")
 	# println("external $external")
 	# println("substitutions $subst")
 	# println("graph  $vg")
-end
-
-function prepare!(m::ParsingStruct)
-
-	m.used, m.touched, m.external, vg, m.exprs = varGraph(m.exprs)
-	
-	haskey(vg, m.outsym) || error("expression outcome does appear in expression")
-
-	ancestors(v::Symbol) = union(Set(v), haskey(vg, v) ? mapreduce(explore, union, vg[v]) : Set())
-
-	mi = setdiff(m.insyms, ancestors(m.outsym))
-	length(mi) == 0 || error("input params $mi do not appear to influence outcome")
-
-	children(v::Symbol) = 
-	m.avars = intersect()
-	m.exprs = 
-
 end
 
 ######### renames variables set several times to make them unique  #############
