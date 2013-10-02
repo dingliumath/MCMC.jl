@@ -5,6 +5,9 @@
 ##########################################################################################
 # TODO : add operators : hcat, vcat, ? : , map, mapreduce, if else 
 
+#########   function to declare a new type in Autodiff (for extensibility)  ######
+linkType(a::Type, na::Symbol) = eval(:( $na = $a ))
+
 #########   macro and function to simplify derivation rules creation  ###########
 function dfunc(func::Expr, dv::Symbol, diff::Expr)
 	argsn = map(e-> isa(e, Symbol) ? e : e.args[1], func.args[2:end])

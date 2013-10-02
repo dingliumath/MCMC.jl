@@ -63,6 +63,10 @@ end
 #  that would have been created
 #
 function generateModelFunction(model::Expr; gradient=false, debug=false, init...)
+	nmod = prepare(model, init)
+
+	head, body, outsym = Autodiff.diff(nmod; init...)
+
 	m = ParsingStruct()
 
 	## checks initial values
@@ -75,6 +79,8 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 	unfold!(m)
 	uniqueVars!(m)
 	categorizeVars!(m)
+
+
 
 	## build function expression
 	if gradient  # case with gradient

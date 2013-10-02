@@ -4,54 +4,61 @@
 #
 ##########################################################################################
 
-##  for logpdf(Distrib,x)
+####### creates multiple rules at once for logpdf(Distrib, x)
 macro dlogpdfd(dist::Symbol, rule)
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
-	dfunc( sig, :d, rule ) 
+	Autodiff.dfunc( sig, :d, rule ) 
 
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::AbstractArray) )
-	rule2 = substSymbols(rule, {:x => :(x[i]), :ds => :(ds[i])})
-	dfunc( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+	rule2 = Autodiff.substSymbols(rule, {:x => :(x[i]), :ds => :(ds[i])})
+	Autodiff.dfunc( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
 
 	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::AbstractArray) )
-	rule2 = substSymbols(rule, {:dd1 => :(dd1[i]), :dd2 => :(dd2[i]), :dd3 => :(dd3[i]), 
+	rule2 = Autodiff.substSymbols(rule, {:dd1 => :(dd1[i]), :dd2 => :(dd2[i]), :dd3 => :(dd3[i]), 
 		:x => :(x[i]), :ds => :(ds[i]), :d => :(d[i]) })
-	dfunc(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+	Autodiff.dfunc(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
 end
 
 macro dlogpdfx(dist::Symbol, rule)
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
-	dfunc( sig, :x, rule ) 
+	Autodiff.dfunc( sig, :x, rule ) 
 
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::AbstractArray) )
-	rule2 = substSymbols(rule, {:dx => :(dx[i]), :x => :(x[i]), :ds => :(ds[i])})
-	dfunc( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
+	rule2 = Autodiff.substSymbols(rule, {:dx => :(dx[i]), :x => :(x[i]), :ds => :(ds[i])})
+	Autodiff.dfunc( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
 
 	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::AbstractArray) )
-	rule3 = substSymbols(rule2, {:d => :(d[i])})
-	dfunc( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
+	rule3 = Autodiff.substSymbols(rule2, {:d => :(d[i])})
+	Autodiff.dfunc( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
 end
 
-# log lik accumulator type 
-# Note : only additions are possible with LLAcc type 
-@dfunc +(x::LLAcc, y       )    x     dx += ds
-@dfunc +(x::LLAcc, y::Real)     y     dy += ds
-@dfunc +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds ;end
 
-#  All Distribution types constructors
+####### derivation of LLAcc type constructor 
+# (note : only additions are possible with LLAcc type )
+Autodiff.@dfunc +(x::LLAcc, y      )    x     dx += ds
+Autodiff.@dfunc +(x::LLAcc, y::Real)     y     dy += ds
+Autodiff.@dfunc +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds ;end
+
+####### derivation for Distribution types constructors
+
+
 for d in [:Bernoulli, :TDist, :Exponential, :Poisson]  
-	dfunc(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
-	dfunc(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
+	Autodiff.linkType(eval(d), d)
+
+	Autodiff.dfunc(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
+	Autodiff.dfunc(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
 end
 
-for d in [:Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
-	dfunc(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )
-	dfunc(:( ($d)(p1::Real, p2::Real) ),   :p2, :( dp2 = ds2 ) )
-	dfunc(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p1, :( copy!(dp1, ds1) ) )
-	dfunc(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p2, :( copy!(dp2, ds2) ) )
+for d in [ :Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
+	Autodiff.linkType(eval(d), d)
+
+	Autodiff.dfunc(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )
+	Autodiff.dfunc(:( ($d)(p1::Real, p2::Real) ),   :p2, :( dp2 = ds2 ) )
+	Autodiff.dfunc(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p1, :( copy!(dp1, ds1) ) )
+	Autodiff.dfunc(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p2, :( copy!(dp2, ds2) ) )
 end
 
-## Normal distribution
+#######   Normal distribution
 @unix_only begin
 	@dlogpdfx Normal dx += (d.μ - x) / (d.σ * d.σ) * ds
 	@dlogpdfd Normal ( 	dd1 += (x - d.μ) / (d.σ*d.σ) * ds;
