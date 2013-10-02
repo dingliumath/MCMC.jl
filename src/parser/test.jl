@@ -1,13 +1,44 @@
 
-@windows_only begin
-    cd("p:/Documents/julia/MCMC.jl.fredo/src/autodiff")
-    include("mymod.jl")
-    include("p:/Documents/julia/MCMC.jl.fredo/src/autodiff/mymod.jl")
+module Mockup3
+    type Newtype ; end;
+
+    module Mockup2
+        cm = current_module()
+        println(" in $cm, parent = $(Base.module_parent(cm))")
+
+        test() = (cm = eval(:(current_module())) ; println(" in $cm, parent = $(Base.module_parent(cm))"))
+    end
 end
-@unix_only begin
-    cd("~/devl/MCMC.jl/src/autodiff")
-    include("/home/fredo/devl/MCMC.jl.fredo/src/autodiff/mymod.jl")
+
+
+Mockup3.Mockup2.test()
+names
+
+let
+    type Abcd ; end;
 end
+
+Abcd
+Newtype
+Mockup3.Newtype
+
+Newtype = Mockup3.Newtype
+
+x = Newtype
+module Mockup
+    include("Sandbox.jl")
+
+    # naming conventions 
+    const ACC_SYM = :_acc       # name of accumulator variable
+    const PARAM_SYM = :_beta    # name of parameter vector
+end
+
+cd("parser")
+pwd()
+
+whos()
+Mockup.Autodiff.d_log_x1
+Mockup.Sandbox.Autodiff.d_logpdf_x1
 
 include("/home/fredo/devl/MCMC.jl.fredo/src/MCMC.jl")
 

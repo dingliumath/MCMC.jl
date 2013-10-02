@@ -10,10 +10,10 @@
 
 module Autodiff
 
-	using Distributions
+	# using Distributions
 	using Base.LinAlg.BLAS
 
-	export getSymbols, substSymbols, diff, @dfunc, dfunc
+	export getSymbols, substSymbols, diff, @dfunc, dfunc, linkType
 
 	# naming conventions
 	const TEMP_NAME = "tmp"     # prefix of temporary variables in log-likelihood function
@@ -91,27 +91,15 @@ module Autodiff
 		end
 	end
 
-	# immutable PDims
-	# 	pos::Integer   # starting position of parameter in the parameter vector
-	# 	dims::Tuple    # dimensions of user facing parameter, can be a scalar, vector or matrix
-	# end
-	# typealias PMap Dict{Symbol, PDims}
-
 	######### structure for parsing model  ##############
 	type ParsingStruct
 		bsize::Int                # length of beta, the parameter vector
 		init::Vector 			  # initial values of input variables
+		insyms::Vector{Symbol}    # input vars symbols
+		outsym::Symbol            # output variable name (possibly renamed from initial out argument)
 		source::Expr              # model source
 		exprs::Vector{Expr}       # vector of assigments that make the model
 		dexprs::Vector{Expr}      # vector of assigments that make the gradient
-		insyms::Vector{Symbol}    # input vars symbols
-		outsym::Symbol            # output variable name (possibly renamed from initial out argument)
-		# varsset::Set{Symbol}    # all the vars set in the model
-		# pardesc::Set{Symbol}    # all the vars set in the model that depend on model parameters
-		# accanc::Set{Symbol}     # all the vars (possibly external) that influence the accumulator
-		touched::Set{Symbol}      # all the vars set in the model
-		pardesc::Set{Symbol}      # all the vars set in the model that depend on model parameters
-		accanc::Set{Symbol}       # all the vars (possibly external) that influence the accumulator
 
 		ag::Dict  # variable ancestors graph
 		dg::Dict  # variable decendants graph
