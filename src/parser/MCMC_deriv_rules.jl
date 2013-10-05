@@ -7,55 +7,54 @@
 ####### creates multiple rules at once for logpdf(Distrib, x)
 macro dlogpdfd(dist::Symbol, rule)
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
-	Autodiff.dfunc( sig, :d, rule ) 
+	Autodiff.deriv_rule( sig, :d, rule ) 
 
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::AbstractArray) )
 	rule2 = Autodiff.substSymbols(rule, {:x => :(x[i]), :ds => :(ds[i])})
-	Autodiff.dfunc( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+	Autodiff.deriv_rule( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
 
 	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::AbstractArray) )
 	rule2 = Autodiff.substSymbols(rule, {:dd1 => :(dd1[i]), :dd2 => :(dd2[i]), :dd3 => :(dd3[i]), 
 		:x => :(x[i]), :ds => :(ds[i]), :d => :(d[i]) })
-	Autodiff.dfunc(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+	Autodiff.deriv_rule(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
 end
 
 macro dlogpdfx(dist::Symbol, rule)
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
-	Autodiff.dfunc( sig, :x, rule ) 
+	Autodiff.deriv_rule( sig, :x, rule ) 
 
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::AbstractArray) )
 	rule2 = Autodiff.substSymbols(rule, {:dx => :(dx[i]), :x => :(x[i]), :ds => :(ds[i])})
-	Autodiff.dfunc( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
+	Autodiff.deriv_rule( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
 
 	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::AbstractArray) )
 	rule3 = Autodiff.substSymbols(rule2, {:d => :(d[i])})
-	Autodiff.dfunc( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
+	Autodiff.deriv_rule( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
 end
 
 
 ####### derivation of LLAcc type constructor 
 # (note : only additions are possible with LLAcc type )
-Autodiff.@dfunc +(x::LLAcc, y      )    x     dx += ds
-Autodiff.@dfunc +(x::LLAcc, y::Real)     y     dy += ds
-Autodiff.@dfunc +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds ;end
+Autodiff.@deriv_rule +(x::LLAcc, y      )             x     dx += ds
+Autodiff.@deriv_rule +(x::LLAcc, y::Real)             y     dy += ds
+Autodiff.@deriv_rule +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds ;end
 
 ####### derivation for Distribution types constructors
-
 
 for d in [:Bernoulli, :TDist, :Exponential, :Poisson]  
 	Autodiff.linkType(eval(d), d)
 
-	Autodiff.dfunc(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
-	Autodiff.dfunc(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
+	Autodiff.deriv_rule(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
+	Autodiff.deriv_rule(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
 end
 
 for d in [ :Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
 	Autodiff.linkType(eval(d), d)
 
-	Autodiff.dfunc(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )
-	Autodiff.dfunc(:( ($d)(p1::Real, p2::Real) ),   :p2, :( dp2 = ds2 ) )
-	Autodiff.dfunc(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p1, :( copy!(dp1, ds1) ) )
-	Autodiff.dfunc(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p2, :( copy!(dp2, ds2) ) )
+	Autodiff.deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )
+	Autodiff.deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p2, :( dp2 = ds2 ) )
+	Autodiff.deriv_rule(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p1, :( copy!(dp1, ds1) ) )
+	Autodiff.deriv_rule(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p2, :( copy!(dp2, ds2) ) )
 end
 
 #######   Normal distribution
@@ -108,10 +107,9 @@ end
 					 	dd2 += (d.meanlog*d.meanlog - d.sdlog*d.sdlog - log(x)*(2d.meanlog-log(x))) / (d.sdlog*d.sdlog*d.sdlog) * ds )
 @dlogpdfx LogNormal   dx += (d.meanlog - d.sdlog*d.sdlog - log(x)) / (d.sdlog*d.sdlog*x) * ds 
 
-
-# # TODO : find a way to implement multi variate distribs that goes along well with vectorization (Dirichlet, Categorical)
-# # TODO : other continuous distribs ? : Pareto, Rayleigh, Logistic, Levy, Laplace, Dirichlet, FDist
-# # TODO : other discrete distribs ? : NegativeBinomial, DiscreteUniform, HyperGeometric, Geometric, Categorical
+# Note : vectorization will not be easily possible for multi variate distribs (Dirichlet, Categorical)
+# TODO : add other continuous distribs ? : Pareto, Rayleigh, Logistic, Levy, Laplace, Dirichlet, FDist
+# TODO : add other discrete distribs ? : NegativeBinomial, DiscreteUniform, HyperGeometric, Geometric, Categorical
 
 ## Bernoulli distribution (Note : no derivation on x parameter as it is an integer)
 @dlogpdfd Bernoulli     dd1 += 1. / (d.p1 - 1. + x) * ds

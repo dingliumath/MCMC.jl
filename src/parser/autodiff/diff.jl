@@ -7,11 +7,11 @@ function diff(model::Expr, out::Symbol; init...)
    	assert(length(init)>=1, "There should be at least one parameter specified, none found")
 
 	m = ParsingStruct()
+	m.source = model
+
 	m.outsym = out
 	m.insyms = map(sv->sv[1], init)
 	m.init = map(sv->sv[2], init)
-	m.source = model
-	m.exprs = Expr[]
 	m.dexprs = Expr[]
 
 	unfold!(m)	

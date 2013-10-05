@@ -29,11 +29,11 @@ end
 ######### builds the gradient expression from unfolded expression ##############
 function backwardSweep!(m::ParsingStruct)  
 
-	explore(ex::Expr) = explore(toExprH(ex))
-	explore(ex::ExprH) = error("[backwardSweep] unmanaged expr type $(ex.head)")
-	explore(ex::Exprline) = nothing
+	explore(ex::Expr) = explore(toExH(ex))
+	explore(ex::ExH) = error("[backwardSweep] unmanaged expr type $(ex.head)")
+	explore(ex::ExLine) = nothing
 
-	function explore(ex::Exprequal)
+	function explore(ex::ExEqual)
 		lhs = ex.args[1]
 		assert(isSymbol(lhs) || isRef(lhs), "[backwardSweep] not a symbol / ref on LHS of assigment $(ex)")
 		dsym = lhs
@@ -54,7 +54,7 @@ function backwardSweep!(m::ParsingStruct)
 				push!(m.dexprs, :( $vsym2 = $dsym2))
 			end
 
-		elseif isa(toExprH(rhs), Exprcall)  
+		elseif isa(toExH(rhs), ExCall)  
 			for i in 2:length(rhs.args) 
 				vsym = rhs.args[i]
 				if isa(vsym, Symbol) && contains(avars, vsym)

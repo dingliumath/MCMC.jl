@@ -1,48 +1,49 @@
+#####################""
+    module Mockup3
+        type Newtype ; end;
 
-module Mockup3
-    type Newtype ; end;
+        module Mockup2
+            cm = current_module()
+            println(" in $cm, parent = $(Base.module_parent(cm))")
 
-    module Mockup2
-        cm = current_module()
-        println(" in $cm, parent = $(Base.module_parent(cm))")
-
-        test() = (cm = eval(:(current_module())) ; println(" in $cm, parent = $(Base.module_parent(cm))"))
+            test() = (cm = eval(:(current_module())) ; println(" in $cm, parent = $(Base.module_parent(cm))"))
+        end
     end
-end
 
 
-Mockup3.Mockup2.test()
-names
-
-let
-    type Abcd ; end;
-end
-
-Abcd
-Newtype
-Mockup3.Newtype
-
-Newtype = Mockup3.Newtype
-
-x = Newtype
-module Mockup
-    include("Sandbox.jl")
-
-    # naming conventions 
-    const ACC_SYM = :_acc       # name of accumulator variable
-    const PARAM_SYM = :_beta    # name of parameter vector
-end
-
-cd("parser")
-pwd()
-
-whos()
-Mockup.Autodiff.d_log_x1
-Mockup.Sandbox.Autodiff.d_logpdf_x1
-
-include("/home/fredo/devl/MCMC.jl.fredo/src/MCMC.jl")
 
 
+
+    Mockup3.Mockup2.test()
+    names
+
+    let
+        type Abcd ; end;
+    end
+
+    Abcd
+    Newtype
+    Mockup3.Newtype
+
+    Newtype = Mockup3.Newtype
+
+    x = Newtype
+    module Mockup
+        include("Sandbox.jl")
+
+        # naming conventions 
+        const ACC_SYM = :_acc       # name of accumulator variable
+        const PARAM_SYM = :_beta    # name of parameter vector
+    end
+
+    cd("parser")
+    pwd()
+
+    whos()
+    Mockup.Autodiff.d_log_x1
+    Mockup.Sandbox.Autodiff.d_logpdf_x1
+
+    include("/home/fredo/devl/MCMC.jl.fredo/src/MCMC.jl")
 ######
 
 	b = 12
@@ -72,37 +73,35 @@ include("/home/fredo/devl/MCMC.jl.fredo/src/MCMC.jl")
     f, a,b,c = Abcd.generateModelFunction(ex, a=a0, gradient=true)
 	f([13., 3.])
 
-y = 0.5
-x = 1.0
-ex = :( x ~ TDist(y) )
-Abcd.debug(ex, y = 0.5)
-Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
-f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
-f([0.5])
-(f([0.5001])[1] - f([0.5])[1])*10000
+    y = 0.5
+    x = 1.0
+    ex = :( x ~ TDist(y) )
+    Abcd.debug(ex, y = 0.5)
+    Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
+    f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
+    f([0.5])
+    (f([0.5001])[1] - f([0.5])[1])*10000
 
-x = [1.0, 0, 1, 1]
-ex = :( x ~ Bernoulli(y) )
-Abcd.debug(ex, y = 0.5)
-Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
-f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
-f([0.5])
-(f([0.5001])[1] - f([0.5])[1])*10000
-
-
-x = [1.0, 0, 1, 1]
-ex = :( x ~ Bernoulli(y) )
-Abcd.debug(ex, y = [0.1:0.1:0.4])
-Abcd.generateModelFunction(ex, gradient=true, y=[0.1:0.1:0.4], debug=true)
-f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=[0.1:0.1:0.4])
-f([0.1:0.1:0.4])
-(f([0.5001])[1] - f([0.5])[1])*10000
+    x = [1.0, 0, 1, 1]
+    ex = :( x ~ Bernoulli(y) )
+    Abcd.debug(ex, y = 0.5)
+    Abcd.generateModelFunction(ex, gradient=true, y=0.5, debug=true)
+    f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=0.5)
+    f([0.5])
+    (f([0.5001])[1] - f([0.5])[1])*10000
 
 
+    x = [1.0, 0, 1, 1]
+    ex = :( x ~ Bernoulli(y) )
+    Abcd.debug(ex, y = [0.1:0.1:0.4])
+    Abcd.generateModelFunction(ex, gradient=true, y=[0.1:0.1:0.4], debug=true)
+    f, a,b,c = Abcd.generateModelFunction(ex, gradient=true, y=[0.1:0.1:0.4])
+    f([0.1:0.1:0.4])
+    (f([0.5001])[1] - f([0.5])[1])*10000
 
 ################
 
-# simulate dataset
+    # simulate dataset
 	srand(1)
 	nbeta = 10 # number of predictors, including intercept
 	beta0 = randn((nbeta,))
@@ -111,17 +110,35 @@ f([0.1:0.1:0.4])
 	X = [ones(n) randn((n, nbeta-1))]
 	Y = float64( rand(n) .< ( 1 ./ (1. + exp(X * beta0))) )
 
-# define model
-ex = quote
-	vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
-	prob = 1 / (1. + exp(X * vars)) 
-	Y ~ Bernoulli(prob)
-end
+    # define model
+    ex = quote
+    	vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
+    	prob = 1 / (1. + exp(X * vars)) 
+    	Y ~ Bernoulli(prob)
+    end
 
-Abcd.debug(ex, vars=zeros(nbeta))  
-Abcd.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)  
-f, t1, t2, t3 = Abcd.generateModelFunction(ex, vars=zeros(nbeta), gradient=true)  
-f(t3)
+    module Sandbox ; include("/home/fredo/devl/MCMC.jl.fredo/src/parser/parser.jl") ; end
+
+    Y = 2.
+    ex = quote
+        x = 3+Y
+        a = 2.
+        z = a*x
+
+        res = sum(z)
+    end
+    Sandbox.diff(ex , :z, a=2.)
+
+    m = Sandbox.Autodiff.ParsingStruct()
+    m.source = ex
+    Sandbox.Autodiff.unfold!(m)
+    m.exprs
+    Sandbox.diff(ex , :z, a=2.)
+
+    Abcd.debug(ex, vars=zeros(nbeta))  
+    Abcd.generateModelFunction(ex, vars=zeros(nbeta), gradient=true, debug=true)  
+    f, t1, t2, t3 = Abcd.generateModelFunction(ex, vars=zeros(nbeta), gradient=true)  
+    f(t3)
 
 
 ##########
