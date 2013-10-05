@@ -13,64 +13,65 @@ module Autodiff
 	# using Distributions
 	using Base.LinAlg.BLAS
 
-	export getSymbols, substSymbols, diff, @dfunc, dfunc, linkType
+	export getSymbols, substSymbols, diff
+	export @deriv_rule, deriv_rule, linkType
 
 	# naming conventions
-	const TEMP_NAME = "tmp"     # prefix of temporary variables in log-likelihood function
+	const TEMP_NAME = "tmp"     # prefix of new variables
 	const DERIV_PREFIX = "_d"   # prefix of gradient variables
 	
 	##########  Parameterized type to ease AST exploration  ############
-	type ExprH{H}
+	type ExH{H}
 		head::Symbol
 		args::Vector
 		typ::Any
 	end
-	toExprH(ex::Expr) = ExprH{ex.head}(ex.head, ex.args, ex.typ)
-	toExpr(ex::ExprH) = Expr(ex.head, ex.args...)
+	toExH(ex::Expr) = ExH{ex.head}(ex.head, ex.args, ex.typ)
+	toExpr(ex::ExH) = Expr(ex.head, ex.args...)
 
-	typealias Exprequal    ExprH{:(=)}
-	typealias Exprdcolon   ExprH{:(::)}
-	typealias Exprpequal   ExprH{:(+=)}
-	typealias Exprmequal   ExprH{:(-=)}
-	typealias Exprtequal   ExprH{:(*=)}
-	typealias Exprtrans    ExprH{symbol("'")} 
-	typealias Exprcall     ExprH{:call}
-	typealias Exprblock	   ExprH{:block}
-	typealias Exprline     ExprH{:line}
-	typealias Exprvcat     ExprH{:vcat}
-	typealias Exprref      ExprH{:ref}
-	typealias Exprif       ExprH{:if}
-	typealias Exprcomp     ExprH{:comparison}
-	typealias Exprdot      ExprH{:.}
+	typealias ExEqual    ExH{:(=)}
+	typealias ExDColon   ExH{:(::)}
+	typealias ExPEqual   ExH{:(+=)}
+	typealias ExMEqual   ExH{:(-=)}
+	typealias ExTEqual   ExH{:(*=)}
+	typealias ExTrans    ExH{symbol("'")} 
+	typealias ExCall     ExH{:call}
+	typealias ExBlock	 ExH{:block}
+	typealias ExLine     ExH{:line}
+	typealias ExVcat     ExH{:vcat}
+	typealias ExRef      ExH{:ref}
+	typealias ExIf       ExH{:if}
+	typealias ExComp     ExH{:comparison}
+	typealias ExDot      ExH{:.}
 
 	## variable symbol sampling functions
-	getSymbols(ex::Any) =        Set{Symbol}()
-	getSymbols(ex::Symbol) =     Set{Symbol}(ex)
-	getSymbols(ex::Array) =      mapreduce(getSymbols, union, ex)
-	getSymbols(ex::Expr) =       getSymbols(toExprH(ex))
-	getSymbols(ex::ExprH) =      mapreduce(getSymbols, union, ex.args)
-	getSymbols(ex::Exprcall) =   mapreduce(getSymbols, union, ex.args[2:end])  # skip function name
-	getSymbols(ex::Exprref) =    setdiff(mapreduce(getSymbols, union, ex.args), Set(:(:), symbol("end")) )# ':'' and 'end' do not count
-	getSymbols(ex::Exprcomp) =   setdiff(mapreduce(getSymbols, union, ex.args), 
+	getSymbols(ex::Any)    = Set{Symbol}()
+	getSymbols(ex::Symbol) = Set{Symbol}(ex)
+	getSymbols(ex::Array)  = mapreduce(getSymbols, union, ex)
+	getSymbols(ex::Expr)   = getSymbols(toExH(ex))
+	getSymbols(ex::ExH)    = mapreduce(getSymbols, union, ex.args)
+	getSymbols(ex::ExCall) = mapreduce(getSymbols, union, ex.args[2:end])  # skip function name
+	getSymbols(ex::ExRef)  = setdiff(mapreduce(getSymbols, union, ex.args), Set(:(:), symbol("end")) )# ':'' and 'end' do not count
+	getSymbols(ex::ExDot)  = Set{Symbol}(ex.args[1])  # return variable, not fields
+	getSymbols(ex::ExComp) = setdiff(mapreduce(getSymbols, union, ex.args), 
 		Set(:(>), :(<), :(>=), :(<=), :(.>), :(.<), :(.<=), :(.>=), :(==)) )
 
-	getSymbols(ex::Exprdot) =     Set{Symbol}(ex.args[1])  # return variable, not fields
 
 	## variable symbol subsitution functions
-	substSymbols(ex::Any, smap::Dict) =           ex
-	substSymbols(ex::Expr, smap::Dict) =          substSymbols(toExprH(ex), smap::Dict)
-	substSymbols(ex::Vector, smap::Dict) =        map(e -> substSymbols(e, smap), ex)
-	substSymbols(ex::ExprH, smap::Dict) =         Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
-	substSymbols(ex::Exprcall, smap::Dict) =      Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
-	substSymbols(ex::Exprdot, smap::Dict) =       (ex = toExpr(ex) ; ex.args[1] = substSymbols(ex.args[1], smap) ; ex)
-	substSymbols(ex::Symbol, smap::Dict) =        get(smap, ex, ex)
+	substSymbols(ex::Any, smap::Dict)     = ex
+	substSymbols(ex::Expr, smap::Dict)    = substSymbols(toExH(ex), smap::Dict)
+	substSymbols(ex::Vector, smap::Dict)  = map(e -> substSymbols(e, smap), ex)
+	substSymbols(ex::ExH, smap::Dict)     = Expr(ex.head, map(e -> substSymbols(e, smap), ex.args)...)
+	substSymbols(ex::ExCall, smap::Dict)  = Expr(:call, ex.args[1], map(e -> substSymbols(e, smap), ex.args[2:end])...)
+	substSymbols(ex::ExDot, smap::Dict)   = (ex = toExpr(ex) ; ex.args[1] = substSymbols(ex.args[1], smap) ; ex)
+	substSymbols(ex::Symbol, smap::Dict)  = get(smap, ex, ex)
 
 	
 	## misc functions
 	dprefix(v::Union(Symbol, String, Char)) = symbol("$DERIV_PREFIX$v")
-	dprefix(v::Expr) = dprefix(toExprH(v))
-	dprefix(v::Exprref) = Expr(:ref, dprefix(v.args[1]), v.args[2:end]...)
-	dprefix(v::Exprdot) = Expr(:., dprefix(v.args[1]), v.args[2:end]...)
+	dprefix(v::Expr)                        = dprefix(toExH(v))
+	dprefix(v::ExRef)                       = Expr(:ref, dprefix(v.args[1]), v.args[2:end]...)
+	dprefix(v::ExDot)                       = Expr(:., dprefix(v.args[1]), v.args[2:end]...)
 
 	isSymbol(ex)   = isa(ex, Symbol)
 	isDot(ex)      = isa(ex, Expr) && ex.head == :.   && isa(ex.args[1], Symbol)
@@ -101,18 +102,18 @@ module Autodiff
 		exprs::Vector{Expr}       # vector of assigments that make the model
 		dexprs::Vector{Expr}      # vector of assigments that make the gradient
 
-		ag::Dict  # variable ancestors graph
-		dg::Dict  # variable decendants graph
+		ag::Dict                  # variable ancestors graph
+		dg::Dict                  # variable descendants graph
 
-		vhint					  # stores all expression values to match adequate derivation rule
+		# vhint					  # stores all expression values to match adequate derivation rule
 
 		ParsingStruct() = new()   # uninitialized constructor
 	end
 
 	# find variables in dependency graph g
-	relations(v::Symbol, g) = haskey(g, v) ? union( g[v], relations(g[v] ,g) ) : Set()
+	relations(v::Symbol, g)  = haskey(g, v) ? union( g[v], relations(g[v] ,g) ) : Set()
 	relations(vs::Vector, g) = union( map( s->relations(s,g) , vs)... )
-	relations(vs::Set, g) = union( map( s->relations(s,g) , [vs...])... )
+	relations(vs::Set, g)    = union( map( s->relations(s,g) , [vs...])... )
 
 	# active variables whose gradient need to be calculated
 	activeVars(m::ParsingStruct) = intersect(relations(m.outsym, m.ag), relations(m.insyms, m.dg))
