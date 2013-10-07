@@ -144,8 +144,8 @@ sprofile_clear()
 @sprofile myf10000()
 sprofile_tree()
 
+###############
+	using Gadfly
 
-
-
-
-
+	p = plot([sin, cos], 0, 20)
+	draw(D3("c:/temp/sincos.js", 6inch, 3inch), p )

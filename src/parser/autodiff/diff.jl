@@ -12,7 +12,7 @@ function diff(model::Expr, out::Symbol; init...)
 	m.outsym = out
 	m.insyms = map(sv->sv[1], init)
 	m.init = map(sv->sv[2], init)
-	m.dexprs = Expr[]
+	dump(m.init)
 
 	unfold!(m)	
 

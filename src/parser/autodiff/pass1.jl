@@ -50,7 +50,7 @@ function unfold!(m::ParsingStruct)
 		#  (easier for derivation)
 		#   applies to +, sum, *, min, max
 		# TODO : apply to other n-ary (n>2) operators ?
-		if contains([:+, :*, :sum, :min, :max], na[1]) 
+		if in(na[1], [:+, :*, :sum, :min, :max]) 
 			while length(args) > 2
 				a2 = pop!(args)
 				a1 = pop!(args)
@@ -113,15 +113,15 @@ function varGraph(vex::Vector{Expr})
 		external = union(external, {setdiff(rhss, touched)...})
 		used = union(used, {rhss...})
 
-		contains(external, lhss) && error("$lhss is both an external variable and a variable set by the model")
+		in(lhss, external) && error("$lhss is both an external variable and a variable set by the model")
 
-		if contains(touched, lhss) # ex is setting an already used variable => new var creation
+		if in(lhss, touched) # ex is setting an already used variable => new var creation
 			subst[lhss] = newvar(lhss) # generate new name, add it to substitution list for following statements
 	        ex.args[2:end] = substSymbols(fa, subst) # replace in lhs
 	        push!(nvex, :( $(subst[lhss]) = similar($lhss) ) ) # need to allocate variable in this case
 	    end
 
-		add!(touched, get(subst, lhss, lhss))
+		push!(touched, get(subst, lhss, lhss))
 		push!(nvex, ex)
 		vg[get(subst, lhss, lhss)] = rhss
 	end
@@ -135,14 +135,14 @@ function varGraph(vex::Vector{Expr})
 		external = union(external, {setdiff(rhss, touched)...})
 		used = union(used, {rhss...})
 
-		contains(external, lhss) && error("$lhss is both an external var and set by the model")
+		in(lhss, external) && error("$lhss is both an external var and set by the model")
 
-		if contains(touched, lhss) # ex is setting an already used variable => new var creation
+		if in(lhss, touched) # ex is setting an already used variable => new var creation
 			subst[lhss] = newvar(lhss) # generate new name, add it to substitution list for following statements
 	        ex.args[1] = substSymbols(lhs, subst) # replace in lhs
 	    end
 
-		add!(touched, get(subst, lhss, lhss))
+		push!(touched, get(subst, lhss, lhss))
 
 		push!(nvex, ex)
 		vg[get(subst, lhss, lhss)] = rhss
@@ -154,7 +154,7 @@ function varGraph(vex::Vector{Expr})
 	vgi = Dict{Symbol, Set}()
 	for (k,v) in vg
 		for s in v
-			haskey(vgi,s) ? add!(vgi[s], k) : (vgi[s] = Set(k))
+			haskey(vgi,s) ? push!(vgi[s], k) : (vgi[s] = Set(k))
 		end
 	end
 

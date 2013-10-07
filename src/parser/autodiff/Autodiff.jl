@@ -7,10 +7,12 @@
 #
 ############################################################################
 
-
 module Autodiff
 
-	# using Distributions
+	# where the derived functions are to be evaluated : the parent module of Autodiff
+    const parent_mod = Base.module_parent(current_module())
+
+	using Distributions  # TODO : remove, shouldn't be necessary
 	using Base.LinAlg.BLAS
 
 	export getSymbols, substSymbols, diff
@@ -116,7 +118,8 @@ module Autodiff
 	relations(vs::Set, g)    = union( map( s->relations(s,g) , [vs...])... )
 
 	# active variables whose gradient need to be calculated
-	activeVars(m::ParsingStruct) = intersect(relations(m.outsym, m.ag), relations(m.insyms, m.dg))
+	activeVars(m::ParsingStruct) = intersect(union(Set(m.outsym), relations(m.outsym, m.ag)), 
+		                                     union(Set(m.insyms...), relations(m.insyms, m.dg)) )
 	# variables that are not defined in expression and are not input variables
 	external(m::ParsingStruct) = setdiff(union(values(m.ag)...), union(Set(keys(m.ag)...), Set(m.insyms...)))
 
