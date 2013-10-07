@@ -16,14 +16,15 @@ function preCalculate(m::ParsingStruct)
 
 	# build and evaluate the let block containing the function and external vars hooks
 	try
-		eval(Expr(:let, Expr(:block, vcat(header, body)...) ))
+		vhint = eval(parent_mod, Expr(:let, Expr(:block, vcat(header, :(vhint=Dict() ), body, :vhint)...) ))
 	catch e
-		error("Model fails to evaluate for initial values given")
+		rethrow(e)
+		# error("Model fails to evaluate for initial values given")
 	end
 
 	res = vhint[m.outsym]
 	!isa(res, Real) && error("Model outcome should be a scalar, $(typeof(res)) found")
-	res == -Inf && error("Initial values out of model support, try other values")
+	# res == -Inf && error("Initial values out of model support, try other values")
 end
 
 ######### builds the gradient expression from unfolded expression ##############
@@ -43,13 +44,13 @@ function backwardSweep!(m::ParsingStruct)
 		if !isSymbol(rhs) && !isa(rhs,Expr) # some kind of number, nothing to do
 
 		elseif isSymbol(rhs) 
-			if contains(avars, rhs)
+			if in(rhs, avars)
 				vsym2 = dprefix(rhs)
 				push!(m.dexprs, :( $vsym2 = $dsym2 ))
 			end
 
 		elseif isRef(rhs)
-			if contains(avars, rhs.args[1])
+			if in(rhs.args[1], avars)
 				vsym2 = dprefix(rhs)
 				push!(m.dexprs, :( $vsym2 = $dsym2))
 			end
@@ -57,7 +58,7 @@ function backwardSweep!(m::ParsingStruct)
 		elseif isa(toExH(rhs), ExCall)  
 			for i in 2:length(rhs.args) 
 				vsym = rhs.args[i]
-				if isa(vsym, Symbol) && contains(avars, vsym)
+				if isa(vsym, Symbol) && in(vsym, avars)
 					m.dexprs = vcat(m.dexprs, derive(rhs, i-1, dsym))
 				end
 			end
@@ -67,6 +68,7 @@ function backwardSweep!(m::ParsingStruct)
 	end
 
 	avars = activeVars(m)
+	m.dexprs = Expr[]
 	for ex2 in reverse(m.exprs)  # proceed backwards
 		assert(isa(ex2, Expr), "[backwardSweep] not an expression : $ex2")
 		explore(ex2)

@@ -108,7 +108,7 @@
 
 	n = 1000
 	X = [ones(n) randn((n, nbeta-1))]
-	Y = float64( rand(n) .< ( 1 ./ (1. + exp(X * beta0))) )
+	Y = rand(n) .< ( 1 ./ (1. + exp(X * beta0)))
 
     # define model
     ex = quote
@@ -117,22 +117,67 @@
     	Y ~ Bernoulli(prob)
     end
 
-    module Sandbox ; include("/home/fredo/devl/MCMC.jl.fredo/src/parser/parser.jl") ; end
+    module Sandbox 
+        @unix_only include("/home/fredo/devl/MCMC.jl.fredo/src/parser/parser.jl")
+        @windows_only include("p:/documents/julia/MCMC.jl.fredo/src/parser/parser.jl")
+    end
+
+    ex2 = quote
+        _acc = 0.0
+        _acc += sum(logpdf(Normal(0, 1.0), vars))
+        prob = 1 / (1. + exp(X * vars)) 
+        _acc += sum(logpdf(Bernoulli(prob), Y))
+    end
+
+    using Distributions
+    Sandbox.diff(ex2, :_acc, vars=zeros(nbeta)) 
+
+    m = Sandbox.Autodiff.ParsingStruct()
+    m.source = ex2
+    Sandbox.Autodiff.unfold!(m)
+    m.exprs
+    m.insyms = [:vars]
+    m.outsym = :_acc
+    m.ag, m.dg, subst, m.exprs = Sandbox.Autodiff.varGraph(m.exprs)
+    m.ag
+    m.dg
+    subst
+    m.exprs
+    m.outsym = symbol("_acc#2#1")
+
+    Sandbox.Autodiff.activeVars(m)
+    Sandbox.Autodiff.relations(m.outsym, m.ag)
+    Sandbox.Autodiff.relations(m.insyms, m.dg)
+    Sandbox.Autodiff.external(m)
+
+    m.init = Any[]
+    push!(m.init, zeros(nbeta))
+    Sandbox.Autodiff.parent_mod
+    Sandbox.Autodiff.preCalculate(m)
+    Sandbox.Autodiff.vhint
 
     Y = 2.
     ex = quote
         x = 3+Y
-        a = 2.
         z = a*x
-
         res = sum(z)
     end
-    Sandbox.diff(ex , :z, a=2.)
+    Sandbox.diff(ex , :res, a=2.)
+
 
     m = Sandbox.Autodiff.ParsingStruct()
     m.source = ex
     Sandbox.Autodiff.unfold!(m)
     m.exprs
+    m.insyms = [:a]
+    m.outsym = :res
+    m.ag, m.dg, subst, m.exprs = Sandbox.Autodiff.varGraph(m.exprs)
+
+    Sandbox.Autodiff.activeVars(m)
+    Sandbox.Autodiff.relations(m.outsym, m.ag)
+    Sandbox.Autodiff.relations(m.insyms, m.dg)
+    Sandbox.Autodiff.external(m)
+
     Sandbox.diff(ex , :z, a=2.)
 
     Abcd.debug(ex, vars=zeros(nbeta))  
@@ -211,18 +256,3 @@
     end
 
 
-
-using Distributions
-
-myex = Abcd.d_Bernoulli_x1([Distributions.Bernoulli(x) for x in [0.1,0.2]])
-
-tmp = Abcd.Bernoulli([0.5, 0.2, 0.3])
-
-tmp[1].p1
-
-ex2 = quote
-	vars ~ Normal(0, 1.0)  # Normal prior, std 1.0 for predictors
-	prob = sum(vars) * sum(X)
-	prob ~ Normal(1,2)
-end
-Abcd.debug(ex2, vars=0.0)  # no method Bernoulli(Array{Float64,1},)
