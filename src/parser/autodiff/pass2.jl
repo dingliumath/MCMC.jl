@@ -55,6 +55,12 @@ function backwardSweep!(m::ParsingStruct)
 				push!(m.dexprs, :( $vsym2 = $dsym2))
 			end
 
+		elseif isDot(rhs)
+			if in(rhs.args[1], avars)
+				println("$(rhs.args[1]) -> $(:( getfield( $(rhs.args[1]), $(Expr(:quote, rhs.args[2])) ) ))  / $dsym ")
+				m.dexprs = vcat(m.dexprs, derive(:( getfield( $(rhs.args[1]), $(Expr(:quote, rhs.args[2])) ) ), 1, dsym))
+			end
+
 		elseif isa(toExH(rhs), ExCall)  
 			for i in 2:length(rhs.args) 
 				vsym = rhs.args[i]
@@ -76,20 +82,21 @@ function backwardSweep!(m::ParsingStruct)
 end
 
 
-
-##########################################################################################
-#
-#    Derivation function 'derive' returning the expr of gradient
-#
-##########################################################################################
+####   Applies derivation rule to statement  ####
 
 ## returns sample value for the given Symbol or Expr (for refs)
 hint(v::Symbol) = vhint[v]
 hint(v) = v  # should be a value if not a Symbol or an Expression
 function hint(v::Expr)
-	assert(v.head == :ref, "[hint] unexpected variable $v")
-	v.args[1] = :( vhint[$(Expr(:quote, v.args[1]))] )
-	eval(v)
+	# assert(v.head == :ref, "[hint] unexpected variable $v")
+	if isRef(v) 
+		v.args[1] = :( vhint[$(Expr(:quote, v.args[1]))] )
+		return eval(v)
+	elseif v.head == :quote  # argument is a symbol (getfield)
+		return v.args[1]
+	else
+		error("[hint] unexpected variable $v ($(v.head))")
+	end
 end
 
 #########   Returns gradient expression of opex       ###########
@@ -107,11 +114,11 @@ function derive(opex::Expr, index::Integer, dsym::Union(Expr,Symbol))  # opex=:(
 
 		smap = { symbol("x$i") => args[i] for i in 1:length(args)}
 		smap[:ds] = ds
-		smap[:ds1] = symbol("$(ds)#1")
-		smap[:ds2] = symbol("$(ds)#2")
-		smap[:dacc] = dprefix(vs)
-		smap[:dacc1] = dprefix("$(vs)#1")
-		smap[:dacc2] = dprefix("$(vs)#2")
+		smap[:ds1] = symbol("$(ds).1")
+		smap[:ds2] = symbol("$(ds).2")
+		smap[:drec] = dprefix(vs)
+		smap[:drec1] = dprefix("$(vs).1")
+		smap[:drec2] = dprefix("$(vs).2")
 		dexp = substSymbols(dexp, smap)
 
 		return dexp

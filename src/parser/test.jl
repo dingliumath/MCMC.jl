@@ -121,6 +121,7 @@
         @unix_only include("/home/fredo/devl/MCMC.jl.fredo/src/parser/parser.jl")
         @windows_only include("p:/documents/julia/MCMC.jl.fredo/src/parser/parser.jl")
     end
+    Sandbox.generateModelFunction(ex, vars=zeros(nbeta))
 
     ex2 = quote
         _acc = 0.0
@@ -129,7 +130,6 @@
         _acc += sum(logpdf(Bernoulli(prob), Y))
     end
 
-    using Distributions
     Sandbox.diff(ex2, :_acc, vars=zeros(nbeta)) 
 
     m = Sandbox.Autodiff.ParsingStruct()
@@ -158,9 +158,11 @@
 
     Y = 2.
     ex = quote
+        res = LLAcc(0.0)
         x = 3+Y
         z = a*x
-        res = sum(z)
+        res += sum(z)
+        res = res.val
     end
     Sandbox.diff(ex , :res, a=2.)
 
@@ -256,3 +258,34 @@
     end
 
 
+
+
+
+d = { :a => 1, :b => 2, :c => 2}
+find(collect(values(d)) .== 1)
+lter((k,v)-> )
+collect(d)
+for (k,v) in d ; findfirst
+
+get(d, :b, nothing)
+getkey(d, :b, nothing)
+indexin(values)
+collect(keys(d))[findin(collect(values(d)), [3])[1]]
+
+d
+filter((k,v)-> v==2, d)
+map((k,v)->)
+
+
+A = [1. 2 ; 3 4]
+B = ones(2,2)
+A * B
+using Base.LinAlg
+A_mul_B(A,B)
+
+C = similar(A)
+A_mul_Bt(C,A,B)
+C
+
+Bv = [4. 5]
+A_mul_Bt(C,A,Bv)

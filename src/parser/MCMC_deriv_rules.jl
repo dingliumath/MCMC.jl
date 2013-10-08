@@ -7,54 +7,55 @@
 ####### creates multiple rules at once for logpdf(Distrib, x)
 macro dlogpdfd(dist::Symbol, rule)
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
-	Autodiff.deriv_rule( sig, :d, rule ) 
+	deriv_rule( sig, :d, rule ) 
 
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::AbstractArray) )
-	rule2 = Autodiff.substSymbols(rule, {:x => :(x[i]), :ds => :(ds[i])})
-	Autodiff.deriv_rule( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+	rule2 = substSymbols(rule, {:x => :(x[i]), :ds => :(ds[i])})
+	deriv_rule( sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
 
 	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::AbstractArray) )
-	rule2 = Autodiff.substSymbols(rule, {:dd1 => :(dd1[i]), :dd2 => :(dd2[i]), :dd3 => :(dd3[i]), 
+	rule2 = substSymbols(rule, {:dd1 => :(dd1[i]), :dd2 => :(dd2[i]), :dd3 => :(dd3[i]), 
 		:x => :(x[i]), :ds => :(ds[i]), :d => :(d[i]) })
-	Autodiff.deriv_rule(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
+	deriv_rule(sig, :d, :(for i in 1:length(x) ; $rule2 ; end))
 end
 
 macro dlogpdfx(dist::Symbol, rule)
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::Real) )
-	Autodiff.deriv_rule( sig, :x, rule ) 
+	deriv_rule( sig, :x, rule ) 
 
 	sig = :( logpdf($(Expr(:(::), :d, dist)), x::AbstractArray) )
-	rule2 = Autodiff.substSymbols(rule, {:dx => :(dx[i]), :x => :(x[i]), :ds => :(ds[i])})
-	Autodiff.deriv_rule( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
+	rule2 = substSymbols(rule, {:dx => :(dx[i]), :x => :(x[i]), :ds => :(ds[i])})
+	deriv_rule( sig, :x, :(for i in 1:length(x) ; $rule2 ; end))
 
 	sig = :( logpdf($(Expr(:(::), :d, Expr(:curly, :Array, dist))), x::AbstractArray) )
-	rule3 = Autodiff.substSymbols(rule2, {:d => :(d[i])})
-	Autodiff.deriv_rule( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
+	rule3 = substSymbols(rule2, {:d => :(d[i])})
+	deriv_rule( sig, :x, :(for i in 1:length(x) ; $rule3 ; end))
 end
 
 
 ####### derivation of LLAcc type constructor 
 # (note : only additions are possible with LLAcc type )
-Autodiff.@deriv_rule +(x::LLAcc, y      )             x     dx += ds
-Autodiff.@deriv_rule +(x::LLAcc, y::Real)             y     dy += ds
-Autodiff.@deriv_rule +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds ;end
+@deriv_rule +(x::LLAcc, y      )             x     dx1 += ds1
+@deriv_rule +(x::LLAcc, y::Real)             y     dy += ds1
+@deriv_rule +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds1 ; end
 
 ####### derivation for Distribution types constructors
+declareType(Distribution, :Distribution)
 
 for d in [:Bernoulli, :TDist, :Exponential, :Poisson]  
-	Autodiff.linkType(eval(d), d)
+	declareType(eval(d), d)
 
-	Autodiff.deriv_rule(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
-	Autodiff.deriv_rule(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
+	deriv_rule(:( ($d)(p::Real) ), :p, :( dp = ds1 ))
+	deriv_rule(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
 end
 
 for d in [ :Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
-	Autodiff.linkType(eval(d), d)
+	declareType(eval(d), d)
 
-	Autodiff.deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )
-	Autodiff.deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p2, :( dp2 = ds2 ) )
-	Autodiff.deriv_rule(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p1, :( copy!(dp1, ds1) ) )
-	Autodiff.deriv_rule(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p2, :( copy!(dp2, ds2) ) )
+	deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )
+	deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p2, :( dp2 = ds2 ) )
+	deriv_rule(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p1, :( copy!(dp1, ds1) ) )
+	deriv_rule(:( ($d)(p1::AbstractArray, p2::AbstractArray) ), :p2, :( copy!(dp2, ds2) ) )
 end
 
 #######   Normal distribution
@@ -83,6 +84,7 @@ end
 @dlogpdfd Beta   ( dd1 += (digamma(d.alpha+d.beta) - digamma(d.alpha) + log(x)) * ds ;
 				    dd2 += (digamma(d.alpha+d.beta) - digamma(d.beta) + log(1-x)) * ds )
 @dlogpdfx Beta   dx += ((d.alpha-1) / x - (d.beta-1)/(1-x)) * ds
+
 
 ## TDist distribution
 @dlogpdfd TDist   dd1 += ((x*x-1)/(x*x + d.df)+log(d.df/(x*x+d.df))+digamma((d.df+1)/2)-digamma(d.df/2))/2 * ds

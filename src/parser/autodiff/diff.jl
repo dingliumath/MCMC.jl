@@ -12,24 +12,17 @@ function diff(model::Expr, out::Symbol; init...)
 	m.outsym = out
 	m.insyms = map(sv->sv[1], init)
 	m.init = map(sv->sv[2], init)
-	dump(m.init)
 
 	unfold!(m)	
 
 	m.ag, m.dg, subst, m.exprs = varGraph(m.exprs)
-	
-	# update new name of outcome variable
-	follow(s) = haskey(subst,s) ? follow(subst[s]) : s
-	m.outsym = follow(m.outsym)
+	m.outsym = get(subst, m.outsym, m.outsym) # update new name of outcome variable
 
 	### controls 
 	relations(m.outsym, m.ag) == Set() && error("outcome variable is not set or is constant")
 
 	ui = setdiff(Set(m.insyms...), relations(m.outsym, m.ag))
 	ui != Set() && error("some input variables ($ui) do not influence outcome")
-
-	# uniqueVars!(m)
-	# categorizeVars!(m)
 
 	preCalculate(m)
 	backwardSweep!(m)
@@ -52,19 +45,19 @@ function diff(model::Expr, out::Symbol; init...)
 			else
 				push!(body, :($dsym = 0.) )
 			end			
-		# elseif 	isa(vh, LLAcc)
-		# 	push!(body, :($dsym = 0.) )
+		elseif 	isa(vh, LLAcc)
+			push!(body, :($(symbol("$dsym.1")) = 0.) )
 		elseif 	isa(vh, Array{Float64})
 			push!(header, :( local $dsym = Array(Float64, $(Expr(:tuple,size(vh)...)))) )
 			push!(body, :( fill!($dsym, 0.) ) )
 		elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
-			push!(body, :( $(symbol("$dsym#1")) = 0. ) )
-			push!(body, :( $(symbol("$dsym#2")) = 0. ) )
+			push!(body, :( $(symbol("$dsym.1")) = 0. ) )
+			push!(body, :( $(symbol("$dsym.2")) = 0. ) )
 		elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-			push!(header, :( local $(symbol("$dsym#1")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
-			push!(header, :( local $(symbol("$dsym#2")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
-			push!(body, :( fill!($(symbol("$dsym#1")), 0.) ) )
-			push!(body, :( fill!($(symbol("$dsym#2")), 0.) ) )
+			push!(header, :( local $(symbol("$dsym.1")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+			push!(header, :( local $(symbol("$dsym.2")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
+			push!(body, :( fill!($(symbol("$dsym.1")), 0.) ) )
+			push!(body, :( fill!($(symbol("$dsym.2")), 0.) ) )
 		else
 			warn("[diff] unknown type $(typeof(vh)), assuming associated gradient is Float64")
 			push!(body, :($dsym = 0.) )
