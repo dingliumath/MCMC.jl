@@ -12,11 +12,12 @@ module Autodiff
 	# where the derived functions are to be evaluated : the parent module of Autodiff
     const parent_mod = Base.module_parent(current_module())
 
-	using Distributions  # TODO : remove, shouldn't be necessary
-	using Base.LinAlg.BLAS
+	# using Distributions  # TODO : remove, shouldn't be necessary
+	# using Base.LinAlg.BLAS
 
 	export getSymbols, substSymbols, diff
-	export @deriv_rule, deriv_rule, linkType
+	export @deriv_rule, deriv_rule, declareType
+	export newvar, resetvar
 
 	# naming conventions
 	const TEMP_NAME = "tmp"     # prefix of new variables

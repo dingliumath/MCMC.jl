@@ -3,7 +3,7 @@
 #    Model Expression parsing
 #      - transforms MCMC specific idioms (~) into regular Julia syntax
 #      - calls Autodiff module for gradient code generation
-#      - evals log-lik function
+#      - creates function
 #
 ##########################################################################
 
@@ -31,100 +31,42 @@ immutable LLAcc
 end
 +(ll::LLAcc, x::Real)           = LLAcc(ll.val + x)
 +(ll::LLAcc, x::Array{Float64}) = LLAcc(ll.val + sum(x))
-Autodiff.linkType(LLAcc, :LLAcc) # declares new type to Autodiff
+declareType(LLAcc, :LLAcc) # declares new type to Autodiff
+@deriv_rule getfield(x::LLAcc, f      )      x     dx1 = ds
 
 #### add new derivation rules to Autodiff
 include("MCMC_deriv_rules.jl")
 
+# naming conventions
+const ACC_SYM = :__acc       # name of accumulator variable
+const PARAM_SYM = :__beta    # name of parameter vector
 
 
 #######################################################################
 #   generates the log-likelihood function
 #######################################################################
+# - 'init' contains the dictionary of model params and their initial value
+# - If 'debug' is set to true, the function returns only the function expression
+#  that would have been created
 function generateModelFunction(model::Expr; gradient=false, debug=false, init...)
-	# - 'init' contains the dictionary of model params and their initial value
-	# - If 'debug' is set to true, the function returns only the model function 
-	#  that would have been created
-	
-	nmod = Sandbox.prepare(model, init)
-	head, body, outsym = Sandbox.Autodiff.diff(nmod; init...)
 
-	m = ParsingStruct()
+	model.head != :block && (model = Expr(:block, model))  # enclose in block if needed
+	length(model.args)==0 && error("model should have at least 1 statement")
 
-	## checks initial values
-	setInit!(m, init)
-	
-	## rewrites ~ , do some formatting ... on the model expression
-	parseModel!(m, model)
+	model = translate(model)
+	model = Expr(:block, [ :($ACC_SYM = LLAcc(0.)), 
+		                   model.args, 
+		                   :( $ACC_SYM = $(Expr(:., ACC_SYM, Expr(:quote, :val)) ) )]... )
 
-	## process model
-	unfold!(m)
-	uniqueVars!(m)
-	categorizeVars!(m)
+	resetvar()  # reset temporary variable numbering (for legibility, not strictly necessary)
+	head, body, outsym = Sandbox.diff(model, ACC_SYM; init...)
+	println(head)
+	println(body)
 
 	## build function expression
 	if gradient  # case with gradient
-		preCalculate(m)
-		backwardSweep!(m)
-
-		body = Expr[] # list of = expr making the model
-		header = Expr[]  # list of expr making the let block var declarations
-
-		# initialization statements 
 		body = [ betaAssign(m)...,              # assigments beta vector -> model parameter vars
-		         :($ACC_SYM = LLAcc(0.)),       # initialize accumulator
-		         :($(dprefix(m.finalacc)) = 1.0)]  # initialize accumulator gradient accumulator  
-
-		avars = setdiff(intersect(m.accanc, m.pardesc), Set(m.finalacc)) # active vars without accumulator, treated above  
-		for v in avars 
-			vh = vhint[v]
-			dsym = dprefix(v)
-			if isa(vh, Real)
-				push!(body, :($dsym = 0.) )
-			elseif 	isa(vh, LLAcc)
-				push!(body, :($dsym = 0.) )
-			elseif 	isa(vh, Array{Float64})
-				push!(header, :( local $dsym = Array(Float64, $(Expr(:tuple,size(vh)...)))) )
-				push!(body, :( fill!($dsym, 0.) ) )
-			elseif 	isa(vh, Distribution)  #  TODO : find real equivalent vector size
-				push!(body, :( $(symbol("$dsym#1")) = 0. ) )
-				push!(body, :( $(symbol("$dsym#2")) = 0. ) )
-			elseif 	isa(vh, Array) && isa(vh[1], Distribution)  #  TODO : find real equivalent vector size
-				push!(header, :( local $(symbol("$dsym#1")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
-				push!(header, :( local $(symbol("$dsym#2")) = Array(Float64, $(Expr(:tuple,size(vh)...)) ) ) )
-				push!(body, :( fill!($(symbol("$dsym#1")), 0.) ) )
-				push!(body, :( fill!($(symbol("$dsym#2")), 0.) ) )
-			else
-				error("[diff] invalid gradient var type $v $(typeof(vh))")
-			end
-		end
-
-		body = [ body, m.exprs..., m.dexprs...]
-		# build function statements, and move to let block constant statements for optimization
-		# fvars = union(Set([e.args[1] for e in body]...), Set(PARAM_SYM)) # vars that are re-evaluated at each function call
-		# for ex in [m.exprs..., m.dexprs...]
-			# if length(intersect(getSymbols(ex.args[2]), fvars)) > 0
-				# push!(body, ex)
-				# fvars = union(fvars, getSymbols(ex.args[1]))
-			# else
-			# 	push!(header, ex)
-			# end
-		# end
-
-		# prefix statements with 'local' at first occurence
-		# vars  = Set(PARAM_SYM)
-		# for i in 1:length(header)
-		# 	if length(intersect(getSymbols(header[i].args[1]), vars)) == 0
-		# 		header[i] = :(local $(header[i]))
-		# 		vars = union(vars, getSymbols(header[i].args[1]))
-		# 	end
-		# end
-		# for i in 1:length(body)
-		# 	if length(intersect(getSymbols(body[i].args[1]), vars)) == 0
-		# 		body[i] = :(local $(body[i]))
-		# 		vars = union(vars, getSymbols(body[i].args[1]))
-		# 	end
-		# end
+		         body]
 
 		# return statement (note : gradient vec should match beta variable mapping)
 		# dexp = { :( vec([$(dsym(p.sym))]) ) for p in m.pars}
@@ -144,7 +86,7 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 				push!(body, :( $gsym[ $(Expr(:quote,r)) ] = vec($dsymp) ))
 			end
 		end
-		push!(body, :( ($(Expr(:., m.finalacc, Expr(:quote, :val))), $gsym) ) )
+		push!(body, :( ($(Expr(:., outsym, Expr(:quote, :val))), $gsym) ) )
 
 		# enclose in a try block
 		body = Expr(:try, Expr(:block, body...),
@@ -158,22 +100,19 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 				          end)
 
 	else  # case without gradient
-		body = [ betaAssign(m)...,         # assigments beta vector -> model parameter vars
-		         :($ACC_SYM = LLAcc(0.)),  # initialize accumulator
-                 m.source.args...,         # model statements
-                 :(return $( Expr(:., ACC_SYM, Expr(:quote, :val)) )) ]
+		# body = [ betaAssign(m)...,         # assigments beta vector -> model parameter vars
+		#          :($ACC_SYM = LLAcc(0.)),  # initialize accumulator
+  #                m.source.args...,         # model statements
+  #                :(return $( Expr(:., ACC_SYM, Expr(:quote, :val)) )) ]
 
-		# enclose in a try block
-		body = Expr(:try, Expr(:block, body...),
-				          :e, 
-				          :(if isa(e, OutOfSupportError); return(-Inf); else; throw(e); end) )
+		# # enclose in a try block
+		# body = Expr(:try, Expr(:block, body...),
+		# 		          :e, 
+		# 		          :(if isa(e, OutOfSupportError); return(-Inf); else; throw(e); end) )
 
-		header = Expr[]
+		# header = Expr[]
 	end
 
-	# identify external vars and add definitions x = Main.x
-	ev = setdiff(m.accanc, union(m.varsset, Set(ACC_SYM), Set(collect(keys(m.pars))...))) # vars that are external to the model
-	header = [[ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in ev]..., header...] # assigment block
 
 	# build and evaluate the let block containing the function and external vars hooks
 	fn = newvar(:ll)
@@ -185,4 +124,33 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 	debug ? body : (eval(body) ; (eval(fn), m.bsize, m.pars, m.init) )
 end
 
+#### translates ~ into regular syntax
+function translate(ex::Expr)
+	if ex.head == :block 
+		return Expr(:block, translate(ex.args)...)
+	elseif ex.head == :call && ex.args[1] == :~
+		fn = symbol("logpdf$(ex.args[3].args[1])")
+		return :( $ACC_SYM += logpdf( $(ex.args[3]), $(ex.args[2]) ) )
+	else
+		return ex
+	end
+end
+translate(ex::Vector) = map(translate, ex)
+translate(ex::Any) = ex
 
+# ACC_SYM = :_acc
+# ex = quote
+# 	b=a+6
+# 	z = log(Y)
+# 	z ~ Normal(1,2)
+# end
+# dump(ex)
+# typeof(ex)
+# typeof(ex.args)
+# ex.head
+# Expr(:block, translate(ex.args)...)
+# ex
+# translate(ex)
+
+# translate(:(x ~Bernoulli(1,2)) )
+# translate([:(b=a+6), :(x ~Bernoulli(1,2)) ] )

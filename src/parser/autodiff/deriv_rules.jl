@@ -6,7 +6,7 @@
 # TODO : add operators : hcat, vcat, ? : , map, mapreduce, if else 
 
 #########   function to declare a new type in Autodiff (for extensibility)  ######
-linkType(a::Type, na::Symbol) = eval(:( $na = $a ))
+declareType(a::Type, na::Symbol) = eval(:( $na = $a ))
 
 #########   macro and function to simplify derivation rules creation  ###########
 function deriv_rule(func::Expr, dv::Symbol, diff::Expr)
@@ -16,9 +16,10 @@ function deriv_rule(func::Expr, dv::Symbol, diff::Expr)
 	# change var names in signature and diff expr to x1, x2, x3, ..
 	smap = { argsn[i] => symbol("x$i") for i in 1:length(argsn) }
 	# symbols for distributions
-	smap[ symbol("d$dv")] = symbol("dacc") 
-	smap[ symbol("d$(dv)1")] = symbol("dacc1")  # notation for Distributions fields derivatives
-	smap[ symbol("d$(dv)2")] = symbol("dacc2")  # notation for Distributions fields derivatives
+	smap[ symbol("d$dv")] = symbol("drec") 
+	# notation for composite type derivatives
+	smap[ symbol("d$(dv)1")] = symbol("drec1")  
+	smap[ symbol("d$(dv)2")] = symbol("drec2")
 
 	args2 = substSymbols(func.args[2:end], smap)
 
