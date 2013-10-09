@@ -15,6 +15,7 @@ function preCalculate(m::ParsingStruct)
 	header = [ :( local $v = $(Expr(:., :Main, Expr(:quote, v))) ) for v in external(m)]
 
 	# build and evaluate the let block containing the function and external vars hooks
+	# Note that evaluation takes place in the parent module (where extra functions are defined)
 	try
 		vhint = eval(parent_mod, Expr(:let, Expr(:block, vcat(header, :(vhint=Dict() ), body, :vhint)...) ))
 	catch e

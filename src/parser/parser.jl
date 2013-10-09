@@ -53,40 +53,21 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 	model.head != :block && (model = Expr(:block, model))  # enclose in block if needed
 	length(model.args)==0 && error("model should have at least 1 statement")
 
-	model = translate(model)
-	model = Expr(:block, [ :($ACC_SYM = LLAcc(0.)), 
+	vsize, pmap, vinit = modelVars(;init...) # model param info
+
+	model = translate(model) # rewrite ~ statements
+	model = Expr(:block, [ :($ACC_SYM = LLAcc(0.)), # add log-lik accumulator initialization
 		                   model.args, 
 		                   :( $ACC_SYM = $(Expr(:., ACC_SYM, Expr(:quote, :val)) ) )]... )
 
 	resetvar()  # reset temporary variable numbering (for legibility, not strictly necessary)
-	head, body, outsym = Sandbox.diff(model, ACC_SYM; init...)
-	println(head)
-	println(body)
+	head, body, outsym = diff(model, ACC_SYM; init...)
 
 	## build function expression
 	if gradient  # case with gradient
-		body = [ betaAssign(m)...,              # assigments beta vector -> model parameter vars
-		         body]
-
-		# return statement (note : gradient vec should match beta variable mapping)
-		# dexp = { :( vec([$(dsym(p.sym))]) ) for p in m.pars}
-		gsym = dprefix(PARAM_SYM)
-		push!(body, :( local $gsym = similar($PARAM_SYM)))
-		for p in keys(m.pars)
-			v = m.pars[p]
-			dsymp = dprefix(p)
-
-			if length(v.dims) == 0  # scalar
-				push!(body, :( $gsym[ $(v.pos) ] = $dsymp ) )
-			elseif length(v.dims) == 1  # vector
-				r = v.pos:(v.pos+prod(v.dims)-1)
-				push!(body, :( $gsym[ $(Expr(:quote,r)) ] = $dsymp ) )
-			else # matrix case  (needs a reshape)
-				r = v.pos:(v.pos+prod(v.dims)-1)
-				push!(body, :( $gsym[ $(Expr(:quote,r)) ] = vec($dsymp) ))
-			end
-		end
-		push!(body, :( ($(Expr(:., outsym, Expr(:quote, :val))), $gsym) ) )
+		body = [ vec2var(;init...),              # assigments beta vector -> model parameter vars
+		         body.args,
+		         :(($outsym, $(var2vec(;init...))))]
 
 		# enclose in a try block
 		body = Expr(:try, Expr(:block, body...),
@@ -114,14 +95,14 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 	end
 
 
-	# build and evaluate the let block containing the function and external vars hooks
-	fn = newvar(:ll)
+	# build and evaluate the let block containing the function and var declarations
+	fn = gensym("ll")
 	body = Expr(:function, Expr(:call, fn, :($PARAM_SYM::Vector{Float64})),	Expr(:block, body) )
-	body = Expr(:let, Expr(:block, :(global $fn), header..., body))
+	body = Expr(:let, Expr(:block, :(global $fn), head.args..., body))
 
 	# println("#############\n$body\n############")
 
-	debug ? body : (eval(body) ; (eval(fn), m.bsize, m.pars, m.init) )
+	debug ? body : (eval(body) ; (eval(fn), vsize, pmap, vinit) )
 end
 
 #### translates ~ into regular syntax
@@ -138,19 +119,56 @@ end
 translate(ex::Vector) = map(translate, ex)
 translate(ex::Any) = ex
 
-# ACC_SYM = :_acc
-# ex = quote
-# 	b=a+6
-# 	z = log(Y)
-# 	z ~ Normal(1,2)
-# end
-# dump(ex)
-# typeof(ex)
-# typeof(ex.args)
-# ex.head
-# Expr(:block, translate(ex.args)...)
-# ex
-# translate(ex)
+### creates mapping statements from Vector{Float64} to model parameter variables
+function vec2var(;init...)
+	ex = Expr[]
+	pos = 1
+	for (v,i) in init
+		sz = size(i)
+		if length(sz) == 0  # scalar
+			push!(ex, :($v = $PARAM_SYM[ $pos ]) )
+			pos += 1
+		elseif length(sz) == 1  # vector
+			r = pos:(pos+sz[1]-1)
+			push!(ex, :($v = $PARAM_SYM[ $(Expr(:(:), pos, pos+sz[1]-1)) ]) )
+			pos += sz[1]
+		else # matrix case  (needs a reshape)
+			r = pos:(pos+prod(sz)-1)
+			push!(ex, :($v = reshape($PARAM_SYM[ $(Expr(:(:), pos, pos+prod(sz)-1)) ], $(sz[1]), $(sz[2]))) )
+			pos += prod(sz)
+		end
+	end
+	ex
+end
 
-# translate(:(x ~Bernoulli(1,2)) )
-# translate([:(b=a+6), :(x ~Bernoulli(1,2)) ] )
+### creates mapping statements from model parameter variables to Vector{Float64}
+function var2vec(;init...)
+	ex = {}
+	for (v,i) in init
+		sz = size(i)
+		if in(length(sz), [0,1]) # scalar or vector
+			push!(ex, dprefix(v))
+		else # matrix case  (needs a reshape)
+			push!(ex, :( vec($(dprefix(v))) ) )
+		end
+	end
+	Expr(:vcat, ex...)
+end
+
+### returns parameter info : total size, vector <-> model parameter map, inital values vector
+function modelVars(;init...)
+	# init = [(:x, 3.)]
+    pars = Dict{Symbol, NTuple{2}}()
+    pos = 1
+    vi = Float64[]
+
+    for (par, def) in init  # par, def = init[1]
+    	isa(def, Real) || isa(def, AbstractVector) || isa(def, AbstractMatrix) ||
+    		error("unsupported parameter type for $(par)")
+
+        pars[par] = (pos, size(def))
+        pos += length(def)
+        vi = [vi, float64([def...])]
+    end
+    (pos-1, pars, vi)
+end

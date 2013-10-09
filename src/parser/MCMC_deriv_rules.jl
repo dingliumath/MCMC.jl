@@ -59,16 +59,9 @@ for d in [ :Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, 
 end
 
 #######   Normal distribution
-@unix_only begin
-	@dlogpdfx Normal dx += (d.μ - x) / (d.σ * d.σ) * ds
-	@dlogpdfd Normal ( 	dd1 += (x - d.μ) / (d.σ*d.σ) * ds;
-						dd2 += ((x - d.μ)*(x - d.μ) / (d.σ*d.σ) - 1.) / d.σ * ds )
-end
-@windows_only begin
-	@dlogpdfx Normal dx += (d.mean - x) / (d.std * d.std) * ds
-	@dlogpdfd Normal ( 	dd1 += (x - d.mean) / (d.std*d.std) * ds;
-						dd2 += ((x - d.mean)*(x - d.mean) / (d.std*d.std) - 1.) / d.std * ds )
-end
+@dlogpdfx Normal dx += (d.μ - x) / (d.σ * d.σ) * ds
+@dlogpdfd Normal ( 	dd1 += (x - d.μ) / (d.σ*d.σ) * ds;
+					dd2 += ((x - d.μ)*(x - d.μ) / (d.σ*d.σ) - 1.) / d.σ * ds )
 
 ## Uniform distribution
 @dlogpdfx Uniform dx += 0.
