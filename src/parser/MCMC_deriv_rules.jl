@@ -33,12 +33,6 @@ macro dlogpdfx(dist::Symbol, rule)
 end
 
 
-####### derivation of LLAcc type constructor 
-# (note : only additions are possible with LLAcc type )
-@deriv_rule +(x::LLAcc, y      )             x     dx1 += ds1
-@deriv_rule +(x::LLAcc, y::Real)             y     dy += ds1
-@deriv_rule +(x::LLAcc, y::AbstractArray)    y     for i in 1:length(y) ; dy[i] += ds1 ; end
-
 ####### derivation for Distribution types constructors
 declareType(Distribution, :Distribution)
 
@@ -101,6 +95,12 @@ end
 @dlogpdfd LogNormal   ( dd1 += (log(x) - d.meanlog) / (d.sdlog*d.sdlog) * ds ;
 					 	dd2 += (d.meanlog*d.meanlog - d.sdlog*d.sdlog - log(x)*(2d.meanlog-log(x))) / (d.sdlog*d.sdlog*d.sdlog) * ds )
 @dlogpdfx LogNormal   dx += (d.meanlog - d.sdlog*d.sdlog - log(x)) / (d.sdlog*d.sdlog*x) * ds 
+
+## Laplace distribution
+@dlogpdfd Laplace   ( dd1 += (x > d.location ? 1 : -1) / d.scale * ds ;  # location
+	                  dd2 += ( abs(x-d.location)/d.scale - 2. ) /d.scale ) # scale
+@dlogpdfx Laplace   dx += (x > d.location ? -1 : 1) / d.scale * ds
+
 
 # Note : vectorization will not be easily possible for multi variate distribs (Dirichlet, Categorical)
 # TODO : add other continuous distribs ? : Pareto, Rayleigh, Logistic, Levy, Laplace, Dirichlet, FDist

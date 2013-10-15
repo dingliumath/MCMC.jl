@@ -121,7 +121,9 @@
         @unix_only include("/home/fredo/devl/MCMC.jl.fredo/src/parser/parser.jl")
         @windows_only include("p:/documents/julia/MCMC.jl.fredo/src/parser/parser.jl")
     end
-    Sandbox.generateModelFunction(ex, vars=zeros(nbeta))
+    Sandbox.generateModelFunction(ex, vars=zeros(nbeta), debug=true, gradient=true)
+    f,vsize, p, i = Sandbox.generateModelFunction(ex, vars=zeros(nbeta), gradient=true)
+    f(i)
 
     ex2 = quote
         _acc = 0.0
@@ -289,3 +291,18 @@ C
 
 Bv = [4. 5]
 A_mul_Bt(C,A,Bv)
+
+
+ex = :(δa = 12 )
+ex.args[1] == :da
+
+ɑ
+α=4
+using Distributions
+d = Normal(1,2)
+d.μ
+μ = 3
+names(d)
+μ=2
+
+a+2

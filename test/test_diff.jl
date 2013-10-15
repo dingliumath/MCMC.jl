@@ -76,6 +76,10 @@ deriv1(:(v2ref[:,1:2]*x), [-3. 2 0 ; 1 1 -2])
 @test_combin    logpdf(LogNormal(lmu,lsc),x)   lsc->lsc<=0?0.1:lsc x->x<=0?0.1:x (size(lmu)==size(lsc)) && 
 								(ndims(lmu)==0 || size(x)==size(lmu))
 
+@test_combin    logpdf(Laplace(loc,sc),x)   sc->sc<=0?0.1:lsc (size(loc)==size(sc)) && 
+								(ndims(loc)==0 || size(x)==size(loc))
+
+
 ## discrete distributions
 #  the variable x being an integer should not be derived against
 
