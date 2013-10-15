@@ -16,25 +16,10 @@ using .Autodiff
 # Distributions extensions, TODO : ask for inclusion in Distributions package
 include("vector_dists.jl")
 
-#### Log-likelihood accumulator type  ####
-# this makes the model function easier to generate compared to a Float64
-#   - embeds the error throwing when log-likelihood reaches -Inf
-#   - calculates the sum when logpdf() returns an Array
-type OutOfSupportError <: Exception ; end
+# Add new derivation rules to Autodiff for LLAcc type
+include("loglik_acc_rules.jl")
 
-immutable LLAcc
-	val::Float64
-	function LLAcc(x::Real)
-		isfinite(x) || throw(OutOfSupportError())
-		new(x)
-	end
-end
-+(ll::LLAcc, x::Real)           = LLAcc(ll.val + x)
-+(ll::LLAcc, x::Array{Float64}) = LLAcc(ll.val + sum(x))
-declareType(LLAcc, :LLAcc) # declares new type to Autodiff
-@deriv_rule getfield(x::LLAcc, f      )      x     dx1 = ds
-
-#### add new derivation rules to Autodiff
+# Add new derivation rules to Autodiff for distributions
 include("MCMC_deriv_rules.jl")
 
 # naming conventions
