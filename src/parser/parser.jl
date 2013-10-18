@@ -9,7 +9,7 @@
 
 using Distributions
 using Base.LinAlg.BLAS
-
+ 
 include("autodiff/Autodiff.jl")
 using .Autodiff
 
