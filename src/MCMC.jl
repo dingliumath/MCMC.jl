@@ -21,9 +21,8 @@ abstract MCMCSampler
 abstract MCMCTuner
 abstract MCMCRunner
 
-###########  Autodiff   ##########
-include("autodiff/autodiff.jl")     #  include model expression parsing function
-using .Autodiff
+###########  Model experssion parsing   ##########
+include("parser/parser.jl")     #  include model expression parsing function
 
 ###########  Models    ##########
 include("modellers/mcmcmodels.jl")      #  include model types definitions    

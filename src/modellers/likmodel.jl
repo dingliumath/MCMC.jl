@@ -68,12 +68,12 @@ function MCMCLikelihoodModel(	m::Expr;
 								args...)
 	# when using expressions, initial values are passed in keyword args
 	#  with one arg by parameter, therefore there is not need for an init arg
-	@assert init == nothing "'init' kwargs not allowed for model as expression\n"
+	init == nothing || error("'init' kwargs not allowed for model as expression\n")
 
 	# same thing with 'pmap'
-	@assert pmap == nothing "'pmap' kwargs not allowed for model as expression\n"
+	pmap == nothing || error("'pmap' kwargs not allowed for model as expression\n")
 
-	# generate lik function
+	# generate log-lik function
 	f, s, p, i = generateModelFunction(m; gradient=false, args...) # loglik only function
 
 	# generate gradient function if requested

@@ -46,10 +46,11 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 		                   :( $ACC_SYM = $(Expr(:., ACC_SYM, Expr(:quote, :val)) ) )]... )
 
 	resetvar()  # reset temporary variable numbering (for legibility, not strictly necessary)
-	head, body, outsym = diff(model, ACC_SYM; init...)
 
 	## build function expression
 	if gradient  # case with gradient
+		head, body, outsym = diff(model, ACC_SYM; init...)
+
 		body = [ vec2var(;init...),              # assigments beta vector -> model parameter vars
 		         body.args,
 		         :(($outsym, $(var2vec(;init...))))]
@@ -66,19 +67,24 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 				          end)
 
 	else  # case without gradient
-		# body = [ betaAssign(m)...,         # assigments beta vector -> model parameter vars
-		#          :($ACC_SYM = LLAcc(0.)),  # initialize accumulator
-  #                m.source.args...,         # model statements
-  #                :(return $( Expr(:., ACC_SYM, Expr(:quote, :val)) )) ]
+		head, body, outsym = diff(model, ACC_SYM, true; init...)
 
-		# # enclose in a try block
-		# body = Expr(:try, Expr(:block, body...),
-		# 		          :e, 
-		# 		          :(if isa(e, OutOfSupportError); return(-Inf); else; throw(e); end) )
+		body = [ vec2var(;init...),              # assigments beta vector -> model parameter vars
+		         body.args,
+		         outsym ]
 
-		# header = Expr[]
+		# enclose in a try block
+		body = Expr(:try, Expr(:block, body...),
+				          :e, 
+				          quote 
+				          	if isa(e, OutOfSupportError)
+				          		return(-Inf)
+				          	else
+				          		throw(e)
+				          	end
+				          end)
+
 	end
-
 
 	# build and evaluate the let block containing the function and var declarations
 	fn = gensym("ll")
@@ -94,9 +100,24 @@ end
 function translate(ex::Expr)
 	if ex.head == :block 
 		return Expr(:block, translate(ex.args)...)
+
 	elseif ex.head == :call && ex.args[1] == :~
-		fn = symbol("logpdf$(ex.args[3].args[1])")
-		return :( $ACC_SYM += logpdf( $(ex.args[3]), $(ex.args[2]) ) )
+		length(ex.args) == 3 || error("Syntax error in ($ex)")
+		# isa(ex.args[3], Expr) || error("Syntax error in ($ex)")
+		# ex.args[3].head == :call || error("Syntax error in ($ex)")
+
+		ex2 = ex.args[3]
+		if isa(ex2, Expr) && length(ex2.args)==2 && ex2.args[1] == :+   #  ~+  (right censoring) statement
+			return :( $ACC_SYM += logccdf( $(ex2.args[2]), $(ex.args[2]) ) )
+
+		elseif isa(ex2, Expr) && length(ex2.args)==2 && ex2.args[1] == :-  #  ~-  (left censoring) statement			
+			return :( $ACC_SYM += logcdf( $(ex2.args[2]), $(ex.args[2]) ) )
+
+		elseif isa(ex2, Expr) || isa(ex2, Symbol)   # ~ statement
+			return :( $ACC_SYM += logpdf( $(ex2), $(ex.args[2]) ) )
+		else
+			error("Syntax error in ($ex)")
+		end
 	else
 		return ex
 	end
@@ -149,7 +170,7 @@ function modelVars(;init...)
 
     for (par, def) in init  # par, def = init[1]
     	isa(def, Real) || isa(def, AbstractVector) || isa(def, AbstractMatrix) ||
-    		error("unsupported parameter type for $(par)")
+    		error("unsupported type for parameter $(par)")
 
         pars[par] = (pos, size(def))
         pos += length(def)
