@@ -43,7 +43,7 @@ for d in [:Bernoulli, :TDist, :Exponential, :Poisson]
 	deriv_rule(:( ($d)(p::AbstractArray) ), :p, :( copy!(dp, ds1) ))
 end
 
-for d in [ :Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta]
+for d in [ :Normal, :Uniform, :Weibull, :Gamma, :Cauchy, :LogNormal, :Binomial, :Beta, :Laplace]
 	declareType(eval(d), d)
 
 	deriv_rule(:( ($d)(p1::Real, p2::Real) ),   :p1, :( dp1 = ds1 ) )

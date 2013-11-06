@@ -58,7 +58,7 @@ function backwardSweep!(m::ParsingStruct)
 
 		elseif isDot(rhs)
 			if in(rhs.args[1], avars)
-				println("$(rhs.args[1]) -> $(:( getfield( $(rhs.args[1]), $(Expr(:quote, rhs.args[2])) ) ))  / $dsym ")
+				# println("$(rhs.args[1]) -> $(:( getfield( $(rhs.args[1]), $(Expr(:quote, rhs.args[2])) ) ))  / $dsym ")
 				m.dexprs = vcat(m.dexprs, derive(:( getfield( $(rhs.args[1]), $(Expr(:quote, rhs.args[2])) ) ), 1, dsym))
 			end
 
