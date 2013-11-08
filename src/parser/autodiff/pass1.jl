@@ -133,7 +133,7 @@ function varGraph(vex::Vector{Expr})
 	    end
 
 		push!(touched, nv)  # add to touched variable set
-		push!(nvex, ex)                         # add to transformed expression vector
+		push!(nvex, ex)     # add to transformed expression vector
 		vg[nv] = rhss       # update dependency graph
 	end
 
