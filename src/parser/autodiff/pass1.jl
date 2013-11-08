@@ -17,14 +17,7 @@ function unfold!(m::ParsingStruct)
 	explore(ex::ExTrans)        = explore(Expr(:call, :transpose, ex.args[1]))
 	explore(ex::Any)            = ex
 
-	# explore(ex::ExBlock) =  mapreduce(explore, (a,b)->b, ex.args)  # process, and return last evaluated
 	explore(ex::ExBlock) = map( ei -> (re = explore(ei) ; re==nothing || push!(m.exprs, re)), ex.args )
-	# function explore(ex::ExBlock)
-	# 	for i in 1:length(ex.args)
-	# 		re = explore(ex.args[i])
-	# 		re==nothing || push!(m.exprs, re)
-	# 	end
-	# end
 
 	function explore(ex::ExEqual) 
 		lhs = ex.args[1]

@@ -81,7 +81,6 @@ function show(io::IO, res::MCMCChain)
   println("$(ncol(res.samples)) parameters x $(nrow(res.samples)) samples, $(round(res.runTime, 1)) sec.")
 end
 
-<<<<<<< HEAD
 #  Definition of * as a shortcut operator for (model, sampler, runner) combination
 *{M<:MCMCModel, S<:MCMCSampler, R<:MCMCRunner}(m::M, s::S, r::R) = spinTask(m, s, r)
 *{M<:MCMCModel, S<:MCMCSampler, R<:MCMCRunner}(m::Array{M}, s::S, r::R) = map((me) -> spinTask(me, s, r), m)
