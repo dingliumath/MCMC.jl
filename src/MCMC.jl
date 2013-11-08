@@ -92,12 +92,6 @@ include("runners/runners.jl")
 include("runners/SerialMC.jl") # Ordinary serial MCMC runner
 include("runners/SerialTempMC.jl") # Serial Tempering Monte-Carlo runner
 include("runners/SeqMC.jl") # Sequential Monte-Carlo runner
-=======
-#############  runners    ########################
-include("runners/run.jl")         # Vanilla runner
-include("runners/seqMC.jl")       # Sequential Monte-Carlo runner
-include("runners/serialMC.jl")    # Serial Tempering Monte-Carlo runner
->>>>>>> all tests pass, except syntax, TBD
 
 #############  MCMC output analysis and diagnostics    ########################
 include("stats/mean.jl") # MCMC mean estimators
