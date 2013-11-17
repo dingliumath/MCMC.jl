@@ -14,13 +14,13 @@ include("autodiff/Autodiff.jl")
 using .Autodiff
 
 # Distributions extensions, TODO : ask for inclusion in Distributions package
-include("vector_dists.jl")
+include("DistributionsExtensions.jl")
 
 # Add new derivation rules to Autodiff for LLAcc type
-include("loglik_acc_rules.jl")
+include("AccumulatorDerivRules.jl")
 
 # Add new derivation rules to Autodiff for distributions
-include("MCMC_deriv_rules.jl")
+include("MCMCDerivRules.jl")
 
 # naming conventions
 const ACC_SYM = :__acc       # name of accumulator variable
