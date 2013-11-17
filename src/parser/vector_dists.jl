@@ -50,7 +50,7 @@ import Distributions: logpdf, logcdf, logccdf
 
 function logpdf{T<:Distribution}(ds::Array{T}, x::AbstractArray)
 	res = Array(Float64, size(ds))
-	assert( size(ds) == size(x), "x and distributions sizes do not match")
+	size(ds) == size(x) || error("x and distributions sizes do not match")
 	for i in 1:length(x)
 		res[i] = logpdf(ds[i], x[i])
 	end
@@ -59,7 +59,7 @@ end
 
 function logcdf{T<:Distribution}(ds::Array{T}, x::AbstractArray)
 	res = Array(Float64, size(ds))
-	assert( size(ds) == size(x), "x and distributions sizes do not match")
+	size(ds) == size(x) || error("x and distributions sizes do not match")
 	for i in 1:length(x)
 		res[i] = logcdf(ds[i], x[i])
 	end
@@ -68,7 +68,7 @@ end
 
 function logccdf{T<:Distribution}(ds::Array{T}, x::AbstractArray)
 	res = Array(Float64, size(ds))
-	assert( size(ds) == size(x), "x and distributions sizes do not match")
+	size(ds) == size(x) || error("x and distributions sizes do not match")
 	for i in 1:length(x)
 		res[i] = logccdf(ds[i], x[i])
 	end

@@ -14,7 +14,6 @@ function unfold!(m::ParsingStruct)
 	explore(ex::ExPEqual)       = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :+, args[1], args[2])) ) )
 	explore(ex::ExMEqual)       = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :-, args[1], args[2])) ) )
 	explore(ex::ExTEqual)       = (args = ex.args ; explore( Expr(:(=), args[1], Expr(:call, :*, args[1], args[2])) ) )
-	explore(ex::ExTrans)        = explore(Expr(:call, :transpose, ex.args[1]))
 	explore(ex::Any)            = ex
 
 	explore(ex::ExBlock) = map( ei -> (re = explore(ei) ; re==nothing || push!(m.exprs, re)), ex.args )
@@ -33,7 +32,6 @@ function unfold!(m::ParsingStruct)
 			error("[unfold] can't handle RHS of assignment $(toExpr(ex))")
 		end
 		return nothing
-		# lhs
 	end
 
 	function explore(ex::ExCall) 
@@ -97,7 +95,7 @@ function varGraph(vex::Vector{Expr})
 
 			fa = ex.args[2:end]
 			lhss = fa[ get(inplace_var, fn, 1) ]
-			assert(isSymbol(lhss), "[varGraph!] expected symbol got $lhss in $ex")
+			isSymbol(lhss) || error("[varGraph!] expected symbol got $lhss in $ex")
 
 			rhss = getSymbols( fa[ 1:length(fa) .!= get(inplace_var, fn, 1) ] )  # FIXME : not true for gemm!
 		else # assigment case
