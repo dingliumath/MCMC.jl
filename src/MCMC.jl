@@ -10,11 +10,11 @@ using DataFrames
 using Distributions
 using Stats
 
-import Base.*, Base.show
-export show, *
-export MCMCTask, MCMCChain, MCMCLikModel, MCMCSampler, MCMCTuner, MCMCRunner
+# import Base.*, Base.show
+# export show, *
+# export MCMCTask, MCMCChain, MCMCLikModel, MCMCSampler, MCMCTuner, MCMCRunner
 
-# Abstract types
+# # Abstract types
 abstract Model
 abstract MCMCModel <: Model
 abstract MCMCSampler

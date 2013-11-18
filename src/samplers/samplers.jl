@@ -17,12 +17,12 @@ immutable MCMCSample
 	diagnostics::Dict{Any,Any}              # sampler-dependant diagnostic variables
 end
 
-MCMCSample(ppars::Vector{Float64}, plogtarget::Float64,
-  pars::Vector{Float64}, logtarget::Float64, diagnostics::Dict{Any,Any}) =
+MCMCSample(ppars::Vector{Float64}, plogtarget::Float64, pars::Vector{Float64}, 
+  logtarget::Float64, diagnostics::Dict{Any,Any}) =  
   MCMCSample(ppars, plogtarget, nothing, pars, logtarget, nothing, diagnostics)
 
-MCMCSample(ppars::Vector{Float64}, plogtarget::Float64, pars::Vector{Float64}, logtarget::Float64) =
-  MCMCSample(ppars, plogtarget, pars, logtarget, Dict())
+MCMCSample(ppars::Vector{Float64}, plogtarget::Float64, pars::Vector{Float64}, 
+  logtarget::Float64) = MCMCSample(ppars, plogtarget, pars, logtarget, Dict())
 
 MCMCSample(ppars::Vector{Float64}, plogtarget::Float64, pgrads::Union(Vector{Float64}, Nothing),
   pars::Vector{Float64}, logtarget::Float64, grads::Union(Vector{Float64}, Nothing)) =
