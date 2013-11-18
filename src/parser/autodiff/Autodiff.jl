@@ -18,7 +18,7 @@ module Autodiff
 
 	# naming conventions
 	const TEMP_NAME = "tmp"     # prefix of new variables
-	const DERIV_PREFIX = "_d"   # prefix of gradient variables
+	const DERIV_PREFIX = "δ"   # prefix of gradient variables
 	
 	##########  Parameterized type to ease AST exploration  ############
 	type ExH{H}

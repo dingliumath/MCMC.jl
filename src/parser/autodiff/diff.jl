@@ -3,12 +3,10 @@
 ############################################################################
 
 function diff(model::Expr, out::Symbol, skipgradient=false; init...)
-	## checks initial values
    	length(init)>=1 || error("There should be at least one parameter specified, none found")
 
 	m = ParsingStruct()
 	m.source = model
-
 	m.outsym = out
 	m.insyms = map(sv->sv[1], init)
 	m.init = map(sv->sv[2], init)

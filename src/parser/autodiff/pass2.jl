@@ -37,7 +37,7 @@ function backwardSweep!(m::ParsingStruct)
 
 	function explore(ex::ExEqual)
 		lhs = ex.args[1]
-		assert(isSymbol(lhs) || isRef(lhs), "[backwardSweep] not a symbol / ref on LHS of assigment $(ex)")
+		isSymbol(lhs) || isRef(lhs) || error("[backwardSweep] not a symbol / ref on LHS of assigment $(ex)")
 		dsym = lhs
 		dsym2 = dprefix(lhs)
 		
@@ -77,7 +77,7 @@ function backwardSweep!(m::ParsingStruct)
 	avars = activeVars(m)
 	m.dexprs = Expr[]
 	for ex2 in reverse(m.exprs)  # proceed backwards
-		assert(isa(ex2, Expr), "[backwardSweep] not an expression : $ex2")
+		isa(ex2, Expr) || error("[backwardSweep] not an expression : $ex2")
 		explore(ex2)
 	end
 end
@@ -89,7 +89,6 @@ end
 hint(v::Symbol) = vhint[v]
 hint(v) = v  # should be a value if not a Symbol or an Expression
 function hint(v::Expr)
-	# assert(v.head == :ref, "[hint] unexpected variable $v")
 	if isRef(v) 
 		v.args[1] = :( vhint[$(Expr(:quote, v.args[1]))] )
 		return eval(v)

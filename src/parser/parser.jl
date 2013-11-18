@@ -14,13 +14,13 @@ include("autodiff/Autodiff.jl")
 using .Autodiff
 
 # Distributions extensions, TODO : ask for inclusion in Distributions package
-include("vector_dists.jl")
+include("DistributionsExtensions.jl")
 
 # Add new derivation rules to Autodiff for LLAcc type
-include("loglik_acc_rules.jl")
+include("AccumulatorDerivRules.jl")
 
 # Add new derivation rules to Autodiff for distributions
-include("MCMC_deriv_rules.jl")
+include("MCMCDerivRules.jl")
 
 # naming conventions
 const ACC_SYM = :__acc       # name of accumulator variable
@@ -41,15 +41,17 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 	vsize, pmap, vinit = modelVars(;init...) # model param info
 
 	model = translate(model) # rewrite ~ statements
+	rv = symbol("$(ACC_SYM)v")  # final result in this variable
 	model = Expr(:block, [ :($ACC_SYM = LLAcc(0.)), # add log-lik accumulator initialization
 		                   model.args, 
-		                   :( $ACC_SYM = $(Expr(:., ACC_SYM, Expr(:quote, :val)) ) )]... )
+		                   # :( $ACC_SYM = $(Expr(:., ACC_SYM, Expr(:quote, :val)) ) )]... )
+		                   :( $rv = $(Expr(:., ACC_SYM, Expr(:quote, :val)) ) )]... )
 
 	resetvar()  # reset temporary variable numbering (for legibility, not strictly necessary)
 
 	## build function expression
 	if gradient  # case with gradient
-		head, body, outsym = diff(model, ACC_SYM; init...)
+		head, body, outsym = diff(model, rv; init...)
 
 		body = [ vec2var(;init...),              # assigments beta vector -> model parameter vars
 		         body.args,
@@ -62,12 +64,12 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 				          	if isa(e, OutOfSupportError)
 				          		return(-Inf, zero($PARAM_SYM))
 				          	else
-				          		throw(e)
+				          		rethrow(e)
 				          	end
 				          end)
 
 	else  # case without gradient
-		head, body, outsym = diff(model, ACC_SYM, true; init...)
+		head, body, outsym = diff(model, rv, true; init...)
 
 		body = [ vec2var(;init...),              # assigments beta vector -> model parameter vars
 		         body.args,
@@ -80,7 +82,7 @@ function generateModelFunction(model::Expr; gradient=false, debug=false, init...
 				          	if isa(e, OutOfSupportError)
 				          		return(-Inf)
 				          	else
-				          		throw(e)
+				          		rethrow(e)
 				          	end
 				          end)
 
