@@ -329,3 +329,33 @@ sprofile_tree()
 
 	p = plot([sin, cos], 0, 20)
 	draw(D3("c:/temp/sincos.js", 6inch, 3inch), p )
+
+
+WARNING: received error 0 while downloading http://download.opensuse.org/reposit
+ories/windows:/mingw:/win32/openSUSE_Factory//repodata/repomd.xml
+
+murl = "http://download.opensuse.org/repositories/windows:/mingw:/win32/openSUSE_Factory//repodata/repomd.xml"
+download(murl)
+
+ENV["http_proxy"] = "frederic.testard:fluXus01@proxy.int.world.socgen:8080"
+
+dest = "c:/temp/abcd.xml"
+run(`wget -O $dest $murl`)
+run(`curl -o $dest -L $murl`)
+run(`fetch -f $dest $murl`)
+ENV
+
+
+	for checkcmd in (:curl, :wget, :fetch)
+		if success(`which $checkcmd` |> DevNull)
+			downloadcmd = checkcmd
+			break
+		end
+	end
+
+
+
+
+
+
+

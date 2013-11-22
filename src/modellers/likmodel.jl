@@ -13,8 +13,8 @@ export MCMCLikModel
 
 println("Loading MCMCLikModel model")
 
-typealias FOrNothing 	Union(Nothing, Function)
-typealias ROrVector 	Union(Real, Vector{Float64})
+typealias ROrVector     Union(Real, Vector{Float64})
+typealias FOrNothing    Union(Nothing, Function)
 
 # The likelihood Model type
 type MCMCLikelihoodModel <: MCMCModel

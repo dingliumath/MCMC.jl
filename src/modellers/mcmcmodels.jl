@@ -15,10 +15,10 @@ function ispartition(m::Dict, n::Integer)
 end
 
 #### misc functions common to all models  ####
-hasvectormethod(f::Function) = !isgeneric(f) | length(methods(f, (Vector{Float64},))) == 1
+hasvectormethod(f::Function)    = !isgeneric(f) | length(methods(f, (Vector{Float64},))) == 1
 hasgradient{M<:MCMCModel}(m::M) = m.evalg != nothing
-hastensor{M<:MCMCModel}(m::M) = m.evalt != nothing
-hasdtensor{M<:MCMCModel}(m::M) = m.evaldt != nothing
+hastensor{M<:MCMCModel}(m::M)   = m.evalt != nothing
+hasdtensor{M<:MCMCModel}(m::M)  = m.evaldt != nothing
 
 #### User-facing model creation function  ####
 
@@ -27,7 +27,7 @@ hasdtensor{M<:MCMCModel}(m::M) = m.evaldt != nothing
 function model(f::Union(Function, Expr); mtype="likelihood", args...)
 	if mtype == "likelihood"
 		return MCMCLikelihoodModel(f; args...)
-	elseif mtype == "whatever"
-	else
+	# elseif mtype == "whatever"
+	# else
 	end
 end
