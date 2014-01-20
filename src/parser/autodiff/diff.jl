@@ -44,8 +44,8 @@ function diff(model::Expr, out::Symbol, skipgradient=false; init...)
 				else
 					push!(body, :($dsym = 0.) )
 				end			
-			elseif 	isa(vh, LLAcc)
-				push!(body, :($(symbol("$dsym.1")) = 0.) )
+			# elseif 	isa(vh, LLAcc)
+			# 	push!(body, :($(symbol("$dsym.1")) = 0.) )
 			elseif 	isa(vh, Array{Float64})
 				push!(header, :( local $dsym = Array(Float64, $(Expr(:tuple,size(vh)...)))) )
 				push!(body, :( fill!($dsym, 0.) ) )

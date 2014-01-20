@@ -6,15 +6,16 @@
 
 module MCMC
 
+using DataArrays
 using DataFrames
 using Distributions
 using Stats
 
-# import Base.*, Base.show
-# export show, *
-# export MCMCTask, MCMCChain, MCMCLikModel, MCMCSampler, MCMCTuner, MCMCRunner
+import Base.*, Base.show
+export show, *
+export MCMCTask, MCMCChain, MCMCLikModel, MCMCSampler, MCMCTuner, MCMCRunner
 
-# # Abstract types
+# Abstract types
 abstract Model
 abstract MCMCModel <: Model
 abstract MCMCSampler
@@ -99,4 +100,5 @@ include("stats/var.jl") # MCMC variance estimators
 include("stats/ess.jl") # Effective sample size and integrated autocorrelation time functions
 include("stats/summary.jl") # Summary statistics for MCMCChain
 include("stats/zv.jl")  # ZV-MCMC estimators
+
 end

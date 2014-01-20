@@ -14,7 +14,7 @@ include("autodiff/Autodiff.jl")
 using .Autodiff
 
 # Distributions extensions, TODO : ask for inclusion in Distributions package
-include("DistributionsExtensions.jl")
+include("DistribtuionsExtensions.jl")
 
 # Add new derivation rules to Autodiff for LLAcc type
 include("AccumulatorDerivRules.jl")
